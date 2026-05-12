@@ -54,6 +54,7 @@ export interface IntegranteGrupo {
   numero: number
   nombre: string
   garantia: string | null
+  tipo_garantia: string | null
   metodo_pago: string
   prendas: Prenda[]
   monto: number

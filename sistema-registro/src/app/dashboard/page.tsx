@@ -6,6 +6,7 @@ import { useAuth } from '@/components/AuthProvider'
 import ProtectedLayout from '@/components/ProtectedLayout'
 import { Alquiler, IntegranteGrupo } from '@/lib/types'
 import { FiUsers, FiLayers, FiDollarSign, FiCreditCard, FiUserCheck, FiPackage } from 'react-icons/fi'
+import Link from 'next/link'
 
 interface DashboardStats {
   totalPendientes: number
@@ -33,6 +34,7 @@ export default function DashboardPage() {
   })
   const [recentAlquileres, setRecentAlquileres] = useState<Alquiler[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedAlquiler, setSelectedAlquiler] = useState<Alquiler | null>(null)
 
   useEffect(() => {
     let active = true
@@ -82,11 +84,16 @@ export default function DashboardPage() {
         garantiasPrendaDevolver: pendientes.filter((a: Alquiler) => a.tipo_garantia.includes('prenda')).length,
       })
 
-      setRecentAlquileres(alquileres.slice(0, 5))
+      setRecentAlquileres(alquileres.slice(0, 10))
       setLoading(false)
     })
     return () => { active = false }
   }, [])
+
+  const isOverdue = (a: Alquiler) => {
+    if (a.estado !== 'pendiente') return false
+    return new Date(a.fecha_devolucion) < new Date()
+  }
 
   return (
     <ProtectedLayout>
@@ -104,7 +111,6 @@ export default function DashboardPage() {
           </div>
         ) : (
           <>
-            {/* Stats principales */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <StatCard
                 icon={<FiPackage className="text-yellow-600" size={22} />}
@@ -132,7 +138,6 @@ export default function DashboardPage() {
               />
             </div>
 
-            {/* Contadores de alquileres individuales y grupales */}
             <div>
               <h2 className="text-lg font-semibold text-gray-800 mb-3">Alquileres Activos</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -163,7 +168,6 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Garantias a devolver */}
             <div>
               <h2 className="text-lg font-semibold text-gray-800 mb-3">Garantias por Devolver</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -194,9 +198,13 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Ultimos alquileres */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-3">Ultimos Registros</h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold text-gray-800">Ultimos Registros</h2>
+                <Link href="/alquileres" className="text-sm text-guindo-700 hover:underline font-medium">
+                  Ver todos
+                </Link>
+              </div>
               <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -212,7 +220,11 @@ export default function DashboardPage() {
                     </thead>
                     <tbody className="divide-y">
                       {recentAlquileres.map(a => (
-                        <tr key={a.id} className="hover:bg-gray-50">
+                        <tr
+                          key={a.id}
+                          className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() => setSelectedAlquiler(a)}
+                        >
                           <td className="px-4 py-3 text-gray-500">{a.codigo}</td>
                           <td className="px-4 py-3 font-medium">{a.nombre_cliente}</td>
                           <td className="px-4 py-3">
@@ -226,13 +238,24 @@ export default function DashboardPage() {
                           </td>
                           <td className="px-4 py-3 text-gray-600">{a.danza}</td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              a.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-700' :
-                              a.estado === 'devuelto' ? 'bg-green-100 text-green-700' :
-                              'bg-red-100 text-red-700'
-                            }`}>
-                              {a.estado}
-                            </span>
+                            {a.estado === 'pendiente' ? (
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                isOverdue(a)
+                                  ? 'bg-yellow-200 text-yellow-800'
+                                  : 'bg-green-100 text-green-700'
+                              }`}>
+                                Alquiler Activo
+                              </span>
+                            ) : (
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                a.estado === 'devuelto' ? 'bg-green-100 text-green-700' :
+                                a.estado === 'perdida' ? 'bg-red-100 text-red-700' :
+                                'bg-red-100 text-red-700'
+                              }`}>
+                                {a.estado === 'devuelto' ? 'Devuelto' :
+                                 a.estado === 'perdida' ? 'Perdida' : a.estado}
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-right font-medium">Bs. {a.precio_total}</td>
                         </tr>
@@ -251,8 +274,57 @@ export default function DashboardPage() {
             </div>
           </>
         )}
+
+        {/* Detail modal */}
+        {selectedAlquiler && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold">Alquiler #{selectedAlquiler.codigo}</h2>
+                <button onClick={() => setSelectedAlquiler(null)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+              </div>
+              <div className="space-y-3 text-sm">
+                <DetailRow label="Cliente" value={selectedAlquiler.nombre_cliente} />
+                <DetailRow label="Celular" value={selectedAlquiler.celular} />
+                <DetailRow label="CI" value={selectedAlquiler.ci || '-'} />
+                <DetailRow label="Tipo" value={selectedAlquiler.tipo} />
+                {selectedAlquiler.nombre_grupo && <DetailRow label="Grupo" value={selectedAlquiler.nombre_grupo} />}
+                <DetailRow label="Danza" value={selectedAlquiler.danza} />
+                <DetailRow label="Prendas" value={selectedAlquiler.prendas.map(p => `${p.nombre} (${p.cantidad})`).join(', ')} />
+                <DetailRow label="Garantia" value={`${selectedAlquiler.garantia} (${selectedAlquiler.tipo_garantia})`} />
+                <DetailRow label="Metodo de pago" value={selectedAlquiler.metodo_pago} />
+                <DetailRow label="Precio" value={`Bs. ${selectedAlquiler.precio_total}`} />
+                <DetailRow label="Fecha alquiler" value={new Date(selectedAlquiler.fecha_alquiler).toLocaleString('es-BO')} />
+                <DetailRow label="Fecha devolucion" value={new Date(selectedAlquiler.fecha_devolucion).toLocaleDateString('es-BO')} />
+                <DetailRow label="Estado" value={selectedAlquiler.estado === 'pendiente' ? 'Alquiler Activo' : selectedAlquiler.estado} />
+                <DetailRow label="Registrado por" value={selectedAlquiler.registrado_por_nombre} />
+                {selectedAlquiler.notas && <DetailRow label="Notas" value={selectedAlquiler.notas} />}
+              </div>
+              <div className="mt-4 flex gap-2">
+                <Link
+                  href={`/alquileres?codigo=${selectedAlquiler.codigo}`}
+                  className="btn-primary flex-1 text-center text-sm"
+                >
+                  Ver en Alquileres
+                </Link>
+                <button onClick={() => setSelectedAlquiler(null)} className="flex-1 py-2 px-4 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </ProtectedLayout>
+  )
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between py-1.5 border-b border-gray-100">
+      <span className="text-gray-500">{label}</span>
+      <span className="font-medium text-gray-900 text-right">{value}</span>
+    </div>
   )
 }
 

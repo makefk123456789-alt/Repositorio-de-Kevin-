@@ -4,17 +4,12 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import ProtectedLayout from '@/components/ProtectedLayout'
 import { Alquiler, IntegranteGrupo } from '@/lib/types'
-import {
-  FiUsers, FiLayers, FiDollarSign, FiCreditCard,
-  FiUserCheck, FiPackage, FiTrendingUp, FiCalendar
-} from 'react-icons/fi'
+import { FiTrendingUp, FiDollarSign, FiUsers, FiCreditCard, FiCalendar, FiLayers, FiPackage } from 'react-icons/fi'
 
-interface FinanzasStats {
-  ingresosTotalMes: number
-  ingresosTotalSemana: number
+interface FinStats {
   ingresosHoy: number
-  totalAlquileresMes: number
-  individualesPendientes: number
+  ingresosTotalSemana: number
+  ingresosTotalMes: number
   personasIndividuales: number
   gruposPendientes: number
   integrantesGrupos: number
@@ -23,25 +18,47 @@ interface FinanzasStats {
   garantiasEfectivoDevolver: number
   garantiasCiDevolver: number
   garantiasPrendaDevolver: number
-  totalGarantiasDevolver: number
-  montoGarantiasEfectivo: number
+  montoGarantiasEfectivo: string
   devueltosHoy: number
   devueltosSemana: number
+  // Detailed breakdowns
+  individualesEfectivo: number
+  individualesQr: number
+  garantiasIndQr: number
+  garantiasIndEfectivo: number
+  grupalesEfectivo: number
+  grupalesQr: number
+  garantiasGrupoQr: number
+  garantiasGrupoEfectivo: number
+}
+
+interface DayData {
+  fecha: string
+  individualesEfectivo: number
+  individualesQr: number
+  grupalesEfectivo: number
+  grupalesQr: number
+  total: number
+  contadorIndividuales: number
+  contadorGrupos: number
+  contadorIntegrantes: number
 }
 
 export default function FinanzasPage() {
-  const [stats, setStats] = useState<FinanzasStats | null>(null)
-  const [alquileresPeriodo, setAlquileresPeriodo] = useState<Alquiler[]>([])
-  const [periodo, setPeriodo] = useState<'hoy' | 'semana' | 'mes' | 'todos'>('mes')
+  const [stats, setStats] = useState<FinStats | null>(null)
+  const [alquileres, setAlquileres] = useState<Alquiler[]>([])
   const [loading, setLoading] = useState(true)
+  const [periodo, setPeriodo] = useState<'hoy' | 'semana' | 'mes' | 'todos'>('hoy')
+  const [dayBreakdown, setDayBreakdown] = useState<DayData[]>([])
 
   useEffect(() => {
     let active = true
     Promise.all([
       supabase.from('alquileres').select('*').order('created_at', { ascending: false }),
       supabase.from('integrantes_grupo').select('*'),
-    ]).then(([{ data: alquileres }, { data: integrantes }]) => {
-      if (!active || !alquileres) return
+    ]).then(([{ data: alqs }, { data: integrantes }]) => {
+      if (!active || !alqs) return
+      setAlquileres(alqs)
 
       const now = new Date()
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -49,52 +66,107 @@ export default function FinanzasPage() {
       startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-      const hoy = alquileres.filter((a: Alquiler) => new Date(a.fecha_alquiler) >= startOfDay)
-      const semana = alquileres.filter((a: Alquiler) => new Date(a.fecha_alquiler) >= startOfWeek)
-      const mes = alquileres.filter((a: Alquiler) => new Date(a.fecha_alquiler) >= startOfMonth)
+      const hoy = alqs.filter((a: Alquiler) => new Date(a.fecha_alquiler) >= startOfDay)
+      const semana = alqs.filter((a: Alquiler) => new Date(a.fecha_alquiler) >= startOfWeek)
+      const mes = alqs.filter((a: Alquiler) => new Date(a.fecha_alquiler) >= startOfMonth)
 
-      const pendientes = alquileres.filter((a: Alquiler) => a.estado === 'pendiente')
-      const individualesPend = pendientes.filter((a: Alquiler) => a.tipo === 'individual')
-      const gruposPend = pendientes.filter((a: Alquiler) => a.tipo === 'grupal')
+      const pendientes = alqs.filter((a: Alquiler) => a.estado === 'pendiente')
+      const individuales = pendientes.filter((a: Alquiler) => a.tipo === 'individual')
+      const grupos = pendientes.filter((a: Alquiler) => a.tipo === 'grupal')
 
-      const grupoIds = gruposPend.map((g: Alquiler) => g.id)
-      const integrantesGruposPend = integrantes
+      const grupoIds = grupos.map((g: Alquiler) => g.id)
+      const integrantesGr = integrantes
         ? integrantes.filter((i: IntegranteGrupo) => grupoIds.includes(i.alquiler_id))
         : []
 
-      const garantiasQr = pendientes.filter((a: Alquiler) => a.tipo_garantia.includes('qr'))
-      const garantiasEfectivo = pendientes.filter((a: Alquiler) => a.tipo_garantia.includes('efectivo'))
-      const garantiasCi = pendientes.filter((a: Alquiler) => a.tipo_garantia.includes('ci'))
-      const garantiasPrenda = pendientes.filter((a: Alquiler) => a.tipo_garantia.includes('prenda'))
-
-      const devueltosHoy = alquileres.filter((a: Alquiler) =>
+      const devueltosHoy = alqs.filter((a: Alquiler) =>
         a.estado === 'devuelto' && a.fecha_devuelto && new Date(a.fecha_devuelto) >= startOfDay
       )
-      const devueltosSemana = alquileres.filter((a: Alquiler) =>
+      const devueltosSemana = alqs.filter((a: Alquiler) =>
         a.estado === 'devuelto' && a.fecha_devuelto && new Date(a.fecha_devuelto) >= startOfWeek
       )
 
+      const individualesEfectivo = individuales.filter((a: Alquiler) => a.metodo_pago === 'efectivo')
+        .reduce((s: number, a: Alquiler) => s + a.precio_total, 0)
+      const individualesQr = individuales.filter((a: Alquiler) => a.metodo_pago === 'qr')
+        .reduce((s: number, a: Alquiler) => s + a.precio_total, 0)
+
+      const garantiasIndQr = individuales.filter((a: Alquiler) => a.tipo_garantia.includes('qr')).length
+      const garantiasIndEfectivo = individuales.filter((a: Alquiler) => a.tipo_garantia.includes('efectivo')).length
+
+      const grupalesEfectivo = grupos.filter((a: Alquiler) => a.metodo_pago === 'efectivo')
+        .reduce((s: number, a: Alquiler) => s + a.precio_total, 0)
+      const grupalesQr = grupos.filter((a: Alquiler) => a.metodo_pago === 'qr')
+        .reduce((s: number, a: Alquiler) => s + a.precio_total, 0)
+
+      const garantiasGrupoQr = grupos.filter((a: Alquiler) => a.tipo_garantia.includes('qr')).length
+      const garantiasGrupoEfectivo = grupos.filter((a: Alquiler) => a.tipo_garantia.includes('efectivo')).length
+
       setStats({
-        ingresosTotalMes: mes.reduce((s: number, a: Alquiler) => s + a.precio_total, 0),
-        ingresosTotalSemana: semana.reduce((s: number, a: Alquiler) => s + a.precio_total, 0),
         ingresosHoy: hoy.reduce((s: number, a: Alquiler) => s + a.precio_total, 0),
-        totalAlquileresMes: mes.length,
-        individualesPendientes: individualesPend.length,
-        personasIndividuales: individualesPend.length,
-        gruposPendientes: gruposPend.length,
-        integrantesGrupos: integrantesGruposPend.length,
-        totalPersonasActivas: individualesPend.length + integrantesGruposPend.length,
-        garantiasQrDevolver: garantiasQr.length,
-        garantiasEfectivoDevolver: garantiasEfectivo.length,
-        garantiasCiDevolver: garantiasCi.length,
-        garantiasPrendaDevolver: garantiasPrenda.length,
-        totalGarantiasDevolver: pendientes.length,
-        montoGarantiasEfectivo: garantiasEfectivo.length * 100,
+        ingresosTotalSemana: semana.reduce((s: number, a: Alquiler) => s + a.precio_total, 0),
+        ingresosTotalMes: mes.reduce((s: number, a: Alquiler) => s + a.precio_total, 0),
+        personasIndividuales: individuales.length,
+        gruposPendientes: grupos.length,
+        integrantesGrupos: integrantesGr.length,
+        totalPersonasActivas: individuales.length + integrantesGr.length,
+        garantiasQrDevolver: pendientes.filter((a: Alquiler) => a.tipo_garantia.includes('qr')).length,
+        garantiasEfectivoDevolver: pendientes.filter((a: Alquiler) => a.tipo_garantia.includes('efectivo')).length,
+        garantiasCiDevolver: pendientes.filter((a: Alquiler) => a.tipo_garantia.includes('ci')).length,
+        garantiasPrendaDevolver: pendientes.filter((a: Alquiler) => a.tipo_garantia.includes('prenda')).length,
+        montoGarantiasEfectivo: (pendientes.filter((a: Alquiler) => a.tipo_garantia.includes('efectivo')).length * 100).toFixed(2),
         devueltosHoy: devueltosHoy.length,
         devueltosSemana: devueltosSemana.length,
+        individualesEfectivo,
+        individualesQr,
+        garantiasIndQr,
+        garantiasIndEfectivo,
+        grupalesEfectivo,
+        grupalesQr,
+        garantiasGrupoQr,
+        garantiasGrupoEfectivo,
       })
 
-      setAlquileresPeriodo(alquileres)
+      // Day breakdown
+      const dateMap: Record<string, DayData> = {}
+      alqs.forEach((a: Alquiler) => {
+        const dateKey = new Date(a.fecha_alquiler).toLocaleDateString('es-BO')
+        if (!dateMap[dateKey]) {
+          dateMap[dateKey] = {
+            fecha: dateKey,
+            individualesEfectivo: 0, individualesQr: 0,
+            grupalesEfectivo: 0, grupalesQr: 0,
+            total: 0, contadorIndividuales: 0, contadorGrupos: 0, contadorIntegrantes: 0,
+          }
+        }
+        const d = dateMap[dateKey]
+        d.total += a.precio_total
+        if (a.tipo === 'individual') {
+          d.contadorIndividuales++
+          if (a.metodo_pago === 'efectivo') d.individualesEfectivo += a.precio_total
+          else if (a.metodo_pago === 'qr') d.individualesQr += a.precio_total
+          else { d.individualesEfectivo += a.precio_total / 2; d.individualesQr += a.precio_total / 2 }
+        } else {
+          d.contadorGrupos++
+          if (a.metodo_pago === 'efectivo') d.grupalesEfectivo += a.precio_total
+          else if (a.metodo_pago === 'qr') d.grupalesQr += a.precio_total
+          else { d.grupalesEfectivo += a.precio_total / 2; d.grupalesQr += a.precio_total / 2 }
+        }
+      })
+
+      if (integrantes) {
+        integrantes.forEach((i: IntegranteGrupo) => {
+          const alq = alqs.find((a: Alquiler) => a.id === i.alquiler_id)
+          if (alq) {
+            const dateKey = new Date(alq.fecha_alquiler).toLocaleDateString('es-BO')
+            if (dateMap[dateKey]) {
+              dateMap[dateKey].contadorIntegrantes++
+            }
+          }
+        })
+      }
+
+      setDayBreakdown(Object.values(dateMap).reverse())
       setLoading(false)
     })
     return () => { active = false }
@@ -107,7 +179,7 @@ export default function FinanzasPage() {
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-    return alquileresPeriodo.filter(a => {
+    return alquileres.filter(a => {
       const fecha = new Date(a.fecha_alquiler)
       if (periodo === 'hoy') return fecha >= startOfDay
       if (periodo === 'semana') return fecha >= startOfWeek
@@ -136,92 +208,118 @@ export default function FinanzasPage() {
                 <FiTrendingUp className="text-guindo-700" /> Ingresos
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <FinCard
-                  icon={<FiDollarSign className="text-green-600" size={24} />}
-                  label="Ingresos Hoy"
-                  value={`Bs. ${stats.ingresosHoy.toFixed(2)}`}
-                  bg="bg-green-50 border-green-200"
-                />
-                <FinCard
-                  icon={<FiDollarSign className="text-blue-600" size={24} />}
-                  label="Ingresos Semana"
-                  value={`Bs. ${stats.ingresosTotalSemana.toFixed(2)}`}
-                  bg="bg-blue-50 border-blue-200"
-                />
-                <FinCard
-                  icon={<FiDollarSign className="text-guindo-700" size={24} />}
-                  label="Ingresos Mes"
-                  value={`Bs. ${stats.ingresosTotalMes.toFixed(2)}`}
-                  bg="bg-guindo-50 border-guindo-200"
-                />
+                <FinCard icon={<FiDollarSign className="text-green-600" size={24} />}
+                  label="Ingresos Hoy" value={`Bs. ${stats.ingresosHoy.toFixed(2)}`} bg="bg-green-50 border-green-200" />
+                <FinCard icon={<FiDollarSign className="text-blue-600" size={24} />}
+                  label="Ingresos Semana" value={`Bs. ${stats.ingresosTotalSemana.toFixed(2)}`} bg="bg-blue-50 border-blue-200" />
+                <FinCard icon={<FiDollarSign className="text-guindo-700" size={24} />}
+                  label="Ingresos Mes" value={`Bs. ${stats.ingresosTotalMes.toFixed(2)}`} bg="bg-guindo-50 border-guindo-200" />
               </div>
             </div>
 
-            {/* Alquileres activos - individuales y grupales */}
+            {/* Contadores */}
             <div>
               <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
                 <FiUsers className="text-guindo-700" /> Alquileres Activos (Pendientes)
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <FinCard
-                  icon={<FiUserCheck className="text-blue-600" size={24} />}
-                  label="Alquileres Individuales"
-                  value={`${stats.personasIndividuales} personas`}
-                  bg="bg-blue-50 border-blue-200"
-                />
-                <FinCard
-                  icon={<FiLayers className="text-purple-600" size={24} />}
-                  label="Grupos"
-                  value={`${stats.gruposPendientes} grupos`}
-                  bg="bg-purple-50 border-purple-200"
-                />
-                <FinCard
-                  icon={<FiUsers className="text-purple-600" size={24} />}
-                  label="Integrantes de Grupos"
-                  value={`${stats.integrantesGrupos} personas`}
-                  bg="bg-purple-50 border-purple-200"
-                />
-                <FinCard
-                  icon={<FiUsers className="text-indigo-600" size={24} />}
-                  label="Total Personas Activas"
-                  value={`${stats.totalPersonasActivas} personas`}
-                  bg="bg-indigo-50 border-indigo-200"
-                  highlight
-                />
+                <FinCard icon={<FiUsers className="text-blue-600" size={24} />}
+                  label="Alquileres Individuales" value={`${stats.personasIndividuales} personas`} bg="bg-blue-50 border-blue-200" />
+                <FinCard icon={<FiLayers className="text-purple-600" size={24} />}
+                  label="Grupos" value={`${stats.gruposPendientes} grupos`} bg="bg-purple-50 border-purple-200" />
+                <FinCard icon={<FiUsers className="text-purple-600" size={24} />}
+                  label="Integrantes de Grupos" value={`${stats.integrantesGrupos} personas`} bg="bg-purple-50 border-purple-200" />
+                <FinCard icon={<FiUsers className="text-indigo-600" size={24} />}
+                  label="Total Personas Activas" value={`${stats.totalPersonasActivas} personas`} bg="bg-indigo-50 border-indigo-200" highlight />
               </div>
             </div>
 
-            {/* Garantias a devolver */}
+            {/* Desglose Alquileres Individuales */}
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <FiDollarSign className="text-blue-600" /> Desglose Alquileres Individuales
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <FinCard icon={<FiDollarSign className="text-green-600" size={24} />}
+                  label="Ingresos Ind. Efectivo" value={`Bs. ${stats.individualesEfectivo.toFixed(2)}`} bg="bg-green-50 border-green-200" />
+                <FinCard icon={<FiCreditCard className="text-cyan-600" size={24} />}
+                  label="Ingresos Ind. QR" value={`Bs. ${stats.individualesQr.toFixed(2)}`} bg="bg-cyan-50 border-cyan-200" />
+                <FinCard icon={<FiDollarSign className="text-green-600" size={24} />}
+                  label="Garantias Ind. Efectivo" value={`${stats.garantiasIndEfectivo} a devolver`} bg="bg-green-50 border-green-200" />
+                <FinCard icon={<FiCreditCard className="text-cyan-600" size={24} />}
+                  label="Garantias Ind. QR" value={`${stats.garantiasIndQr} a devolver`} bg="bg-cyan-50 border-cyan-200" />
+              </div>
+            </div>
+
+            {/* Desglose Alquileres Grupales */}
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <FiDollarSign className="text-purple-600" /> Desglose Alquileres Grupales
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <FinCard icon={<FiDollarSign className="text-green-600" size={24} />}
+                  label="Ingresos Grupal Efectivo" value={`Bs. ${stats.grupalesEfectivo.toFixed(2)}`} bg="bg-green-50 border-green-200" />
+                <FinCard icon={<FiCreditCard className="text-cyan-600" size={24} />}
+                  label="Ingresos Grupal QR" value={`Bs. ${stats.grupalesQr.toFixed(2)}`} bg="bg-cyan-50 border-cyan-200" />
+                <FinCard icon={<FiDollarSign className="text-green-600" size={24} />}
+                  label="Garantias Grupal Efectivo" value={`${stats.garantiasGrupoEfectivo} a devolver`} bg="bg-green-50 border-green-200" />
+                <FinCard icon={<FiCreditCard className="text-cyan-600" size={24} />}
+                  label="Garantias Grupal QR" value={`${stats.garantiasGrupoQr} a devolver`} bg="bg-cyan-50 border-cyan-200" />
+              </div>
+            </div>
+
+            {/* Subtotales */}
+            <div className="bg-white rounded-2xl shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Estado de Resultados</h2>
+              <div className="space-y-3">
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-gray-600">Subtotal Individuales (Efectivo)</span>
+                  <span className="font-medium">Bs. {stats.individualesEfectivo.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-gray-600">Subtotal Individuales (QR)</span>
+                  <span className="font-medium">Bs. {stats.individualesQr.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-200 font-semibold">
+                  <span className="text-gray-800">Subtotal Individuales</span>
+                  <span className="text-blue-700">Bs. {(stats.individualesEfectivo + stats.individualesQr).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-gray-600">Subtotal Grupales (Efectivo)</span>
+                  <span className="font-medium">Bs. {stats.grupalesEfectivo.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-100">
+                  <span className="text-gray-600">Subtotal Grupales (QR)</span>
+                  <span className="font-medium">Bs. {stats.grupalesQr.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-200 font-semibold">
+                  <span className="text-gray-800">Subtotal Grupales</span>
+                  <span className="text-purple-700">Bs. {(stats.grupalesEfectivo + stats.grupalesQr).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between py-3 bg-guindo-50 rounded-xl px-4 mt-2">
+                  <span className="text-lg font-bold text-guindo-800">TOTAL INGRESOS</span>
+                  <span className="text-lg font-bold text-guindo-700">
+                    Bs. {(stats.individualesEfectivo + stats.individualesQr + stats.grupalesEfectivo + stats.grupalesQr).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Garantias */}
             <div>
               <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
                 <FiCreditCard className="text-guindo-700" /> Garantias por Devolver
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <FinCard
-                  icon={<FiCreditCard className="text-cyan-600" size={24} />}
-                  label="Garantias por QR"
-                  value={`${stats.garantiasQrDevolver} a devolver`}
-                  bg="bg-cyan-50 border-cyan-200"
-                />
-                <FinCard
-                  icon={<FiDollarSign className="text-green-600" size={24} />}
-                  label="Garantias en Efectivo"
-                  value={`${stats.garantiasEfectivoDevolver} a devolver`}
-                  sub={`~ Bs. ${stats.montoGarantiasEfectivo}`}
-                  bg="bg-green-50 border-green-200"
-                />
-                <FinCard
-                  icon={<FiCreditCard className="text-orange-600" size={24} />}
-                  label="Garantias CI"
-                  value={`${stats.garantiasCiDevolver} a devolver`}
-                  bg="bg-orange-50 border-orange-200"
-                />
-                <FinCard
-                  icon={<FiPackage className="text-pink-600" size={24} />}
-                  label="Garantias Prenda"
-                  value={`${stats.garantiasPrendaDevolver} a devolver`}
-                  bg="bg-pink-50 border-pink-200"
-                />
+                <FinCard icon={<FiCreditCard className="text-cyan-600" size={24} />}
+                  label="Garantias por QR" value={`${stats.garantiasQrDevolver} a devolver`} bg="bg-cyan-50 border-cyan-200" />
+                <FinCard icon={<FiDollarSign className="text-green-600" size={24} />}
+                  label="Garantias en Efectivo" value={`${stats.garantiasEfectivoDevolver} a devolver`}
+                  sub={`~ Bs. ${stats.montoGarantiasEfectivo}`} bg="bg-green-50 border-green-200" />
+                <FinCard icon={<FiCreditCard className="text-orange-600" size={24} />}
+                  label="Garantias CI" value={`${stats.garantiasCiDevolver} a devolver`} bg="bg-orange-50 border-orange-200" />
+                <FinCard icon={<FiPackage className="text-pink-600" size={24} />}
+                  label="Garantias Prenda" value={`${stats.garantiasPrendaDevolver} a devolver`} bg="bg-pink-50 border-pink-200" />
               </div>
             </div>
 
@@ -231,36 +329,74 @@ export default function FinanzasPage() {
                 <FiCalendar className="text-guindo-700" /> Devoluciones
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FinCard
-                  icon={<FiCheck className="text-green-600" size={24} />}
-                  label="Devueltos Hoy"
-                  value={stats.devueltosHoy.toString()}
-                  bg="bg-green-50 border-green-200"
-                />
-                <FinCard
-                  icon={<FiCheck className="text-blue-600" size={24} />}
-                  label="Devueltos esta Semana"
-                  value={stats.devueltosSemana.toString()}
-                  bg="bg-blue-50 border-blue-200"
-                />
+                <FinCard icon={<CheckIcon className="text-green-600" size={24} />}
+                  label="Devueltos Hoy" value={stats.devueltosHoy.toString()} bg="bg-green-50 border-green-200" />
+                <FinCard icon={<CheckIcon className="text-blue-600" size={24} />}
+                  label="Devueltos esta Semana" value={stats.devueltosSemana.toString()} bg="bg-blue-50 border-blue-200" />
               </div>
             </div>
 
-            {/* Tabla de alquileres por periodo */}
+            {/* Desglose por dias */}
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800 mb-3">Desglose por Dias</h2>
+              <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="text-left px-4 py-3 font-semibold text-gray-600">Fecha</th>
+                        <th className="text-right px-4 py-3 font-semibold text-gray-600">Ind. Efectivo</th>
+                        <th className="text-right px-4 py-3 font-semibold text-gray-600">Ind. QR</th>
+                        <th className="text-right px-4 py-3 font-semibold text-gray-600">Grupal Efectivo</th>
+                        <th className="text-right px-4 py-3 font-semibold text-gray-600">Grupal QR</th>
+                        <th className="text-right px-4 py-3 font-semibold text-gray-600">Total</th>
+                        <th className="text-center px-4 py-3 font-semibold text-gray-600">Ind.</th>
+                        <th className="text-center px-4 py-3 font-semibold text-gray-600">Grupos</th>
+                        <th className="text-center px-4 py-3 font-semibold text-gray-600">Integ.</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {dayBreakdown.slice(0, 30).map(d => (
+                        <tr key={d.fecha} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium">{d.fecha}</td>
+                          <td className="px-4 py-3 text-right">Bs. {d.individualesEfectivo.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right">Bs. {d.individualesQr.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right">Bs. {d.grupalesEfectivo.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right">Bs. {d.grupalesQr.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right font-bold text-guindo-700">Bs. {d.total.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                              {d.contadorIndividuales}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                              {d.contadorGrupos}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+                              {d.contadorIntegrantes}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Detail table by period */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-lg font-semibold text-gray-800">Detalle de Alquileres</h2>
                 <div className="flex gap-2">
                   {(['hoy', 'semana', 'mes', 'todos'] as const).map(p => (
-                    <button
-                      key={p}
-                      onClick={() => setPeriodo(p)}
+                    <button key={p} onClick={() => setPeriodo(p)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                        periodo === p
-                          ? 'bg-guindo-700 text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
+                        periodo === p ? 'bg-guindo-700 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}>
                       {p === 'hoy' ? 'Hoy' : p === 'semana' ? 'Semana' : p === 'mes' ? 'Mes' : 'Todos'}
                     </button>
                   ))}
@@ -289,9 +425,7 @@ export default function FinanzasPage() {
                           <td className="px-4 py-3">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                               a.tipo === 'individual' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
-                            }`}>
-                              {a.tipo}
-                            </span>
+                            }`}>{a.tipo}</span>
                           </td>
                           <td className="px-4 py-3 text-gray-600 capitalize">{a.metodo_pago}</td>
                           <td className="px-4 py-3 text-gray-600 text-xs">{a.garantia}</td>
@@ -300,9 +434,7 @@ export default function FinanzasPage() {
                               a.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-700' :
                               a.estado === 'devuelto' ? 'bg-green-100 text-green-700' :
                               'bg-red-100 text-red-700'
-                            }`}>
-                              {a.estado}
-                            </span>
+                            }`}>{a.estado}</span>
                           </td>
                           <td className="px-4 py-3 text-right font-medium">Bs. {a.precio_total}</td>
                         </tr>
@@ -318,9 +450,7 @@ export default function FinanzasPage() {
                     {getFiltered().length > 0 && (
                       <tfoot className="bg-gray-50 border-t">
                         <tr>
-                          <td colSpan={6} className="px-4 py-3 text-right font-semibold text-gray-600">
-                            Total:
-                          </td>
+                          <td colSpan={6} className="px-4 py-3 text-right font-semibold text-gray-600">Total:</td>
                           <td className="px-4 py-3 text-right font-bold text-guindo-700">
                             Bs. {getFiltered().reduce((s, a) => s + a.precio_total, 0).toFixed(2)}
                           </td>
@@ -355,7 +485,7 @@ function FinCard({ icon, label, value, sub, bg, highlight }: {
   )
 }
 
-function FiCheck(props: { className?: string; size?: number }) {
+function CheckIcon(props: { className?: string; size?: number }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={props.className} width={props.size} height={props.size}>
       <polyline points="20 6 9 17 4 12" />
