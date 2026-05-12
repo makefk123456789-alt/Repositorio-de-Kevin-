@@ -62,6 +62,7 @@ export interface IntegranteGrupo {
   devuelto: boolean
   devuelto_fecha: string | null
   devuelto_por: string | null
+  devuelto_por_nombre: string | null
   created_at: string
 }
 
