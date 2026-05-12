@@ -160,6 +160,7 @@ export default function AlquileresPage() {
         devuelto: nuevoEstado,
         devuelto_fecha: nuevoEstado ? new Date().toISOString() : null,
         devuelto_por: nuevoEstado ? profile.id : null,
+        devuelto_por_nombre: nuevoEstado ? profile.nombre : null,
       })
       .eq('id', integrante.id)
 
@@ -170,7 +171,7 @@ export default function AlquileresPage() {
 
     setIntegrantes(prev =>
       prev.map(i => i.id === integrante.id
-        ? { ...i, devuelto: nuevoEstado, devuelto_fecha: nuevoEstado ? new Date().toISOString() : null, devuelto_por: nuevoEstado ? profile.id : null }
+        ? { ...i, devuelto: nuevoEstado, devuelto_fecha: nuevoEstado ? new Date().toISOString() : null, devuelto_por: nuevoEstado ? profile.id : null, devuelto_por_nombre: nuevoEstado ? profile.nombre : null }
         : i
       )
     )
@@ -255,6 +256,45 @@ export default function AlquileresPage() {
     setNuevoIntPrendas([{ nombre: '', cantidad: 1 }])
     setShowAgregarIntegrante(false)
     setAgregandoInt(false)
+  }
+
+  const marcarTodosIntegrantesDevueltos = async () => {
+    if (!profile || !selected) return
+    const pendientes = integrantes.filter(i => !i.devuelto)
+    if (pendientes.length === 0) {
+      toast('Todos los integrantes ya fueron marcados como devueltos')
+      return
+    }
+    const ahora = new Date().toISOString()
+    const { error } = await supabase
+      .from('integrantes_grupo')
+      .update({
+        devuelto: true,
+        devuelto_fecha: ahora,
+        devuelto_por: profile.id,
+        devuelto_por_nombre: profile.nombre,
+      })
+      .eq('alquiler_id', selected.id)
+      .eq('devuelto', false)
+
+    if (error) {
+      toast.error('Error al marcar todos como devueltos')
+      return
+    }
+
+    setIntegrantes(prev =>
+      prev.map(i => i.devuelto ? i : { ...i, devuelto: true, devuelto_fecha: ahora, devuelto_por: profile.id, devuelto_por_nombre: profile.nombre })
+    )
+
+    await supabase.from('audit_log').insert({
+      usuario_id: profile.id,
+      usuario_nombre: profile.nombre,
+      accion: 'devolucion_todos_integrantes',
+      detalle: `Todos los integrantes marcados como devueltos (${pendientes.length} pendientes) del grupo ${selected.nombre_grupo || selected.nombre_cliente}`,
+      alquiler_id: selected.id,
+    })
+
+    toast.success(`${pendientes.length} integrantes marcados como devueltos`)
   }
 
   const [solicitandoRevertir, setSolicitandoRevertir] = useState<string | null>(null)
@@ -468,11 +508,11 @@ export default function AlquileresPage() {
                           >
                             <FiPrinter size={16} />
                           </button>
-                          {a.estado === 'pendiente' && a.tipo === 'individual' && (
+                          {a.estado === 'pendiente' && (
                             <button
                               onClick={() => marcarDevuelto(a)}
                               className="p-1.5 rounded-lg hover:bg-green-100 text-green-600"
-                              title="Marcar devuelto"
+                              title="Registrar devolucion"
                             >
                               <FiCheck size={16} />
                             </button>
@@ -533,8 +573,8 @@ export default function AlquileresPage() {
                 {selected.notas && <Detail label="Notas" value={selected.notas} />}
               </div>
 
-              {/* Estado de devolucion - INDIVIDUAL */}
-              {selected.tipo === 'individual' && selected.estado === 'pendiente' && (
+              {/* Estado de devolucion */}
+              {selected.estado === 'pendiente' && (
                 <div className="mt-4 p-4 bg-orange-50 border-2 border-orange-200 rounded-2xl">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
@@ -547,7 +587,7 @@ export default function AlquileresPage() {
                   </div>
                 </div>
               )}
-              {selected.tipo === 'individual' && selected.estado === 'devuelto' && (
+              {selected.estado === 'devuelto' && (
                 <div className="mt-4 p-4 bg-green-50 border-2 border-green-300 rounded-2xl">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
@@ -606,6 +646,14 @@ export default function AlquileresPage() {
                           style={{ width: `${integrantes.length > 0 ? (integrantes.filter(i => i.devuelto).length / integrantes.length) * 100 : 0}%` }}
                         />
                       </div>
+                      {selected.estado === 'pendiente' && integrantes.some(i => !i.devuelto) && (
+                        <button
+                          onClick={marcarTodosIntegrantesDevueltos}
+                          className="w-full py-3 px-4 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 flex items-center justify-center gap-2 mb-3 shadow-md"
+                        >
+                          <FiCheck size={18} /> Marcar Todos como Devueltos
+                        </button>
+                      )}
                       {integrantes.filter(i =>
                         !buscarIntegrante ||
                         i.nombre.toLowerCase().includes(buscarIntegrante.toLowerCase()) ||
@@ -656,6 +704,7 @@ export default function AlquileresPage() {
                               {i.devuelto && i.devuelto_fecha && (
                                 <p className="text-xs text-green-600 mt-0.5">
                                   Devolvio: {new Date(i.devuelto_fecha).toLocaleString('es-BO')}
+                                  {i.devuelto_por_nombre ? ` — Registrado por: ${i.devuelto_por_nombre}` : ''}
                                 </p>
                               )}
                             </div>
@@ -782,9 +831,9 @@ export default function AlquileresPage() {
               )}
 
               <div className="mt-4 space-y-2">
-                {selected.estado === 'pendiente' && selected.tipo === 'individual' && (
-                  <button onClick={() => marcarDevuelto(selected)} className="w-full py-3 px-4 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 flex items-center justify-center gap-2">
-                    <FiCheck size={18} /> Marcar como Devuelto
+                {selected.estado === 'pendiente' && (
+                  <button onClick={() => marcarDevuelto(selected)} className="w-full py-4 px-4 bg-green-600 text-white rounded-xl text-base font-bold hover:bg-green-700 flex items-center justify-center gap-2 shadow-lg">
+                    <FiCheck size={20} /> Registrar Devolucion
                   </button>
                 )}
                 {selected.estado === 'pendiente' && (
