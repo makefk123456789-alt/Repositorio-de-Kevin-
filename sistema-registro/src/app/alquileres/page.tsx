@@ -6,7 +6,7 @@ import { useAuth } from '@/components/AuthProvider'
 import ProtectedLayout from '@/components/ProtectedLayout'
 import { Alquiler, IntegranteGrupo } from '@/lib/types'
 import toast from 'react-hot-toast'
-import { FiSearch, FiCheck, FiX, FiAlertTriangle, FiPrinter } from 'react-icons/fi'
+import { FiSearch, FiCheck, FiX, FiAlertTriangle, FiPrinter, FiUserPlus } from 'react-icons/fi'
 
 export default function AlquileresPage() {
   const { profile, isAdmin } = useAuth()
@@ -21,6 +21,14 @@ export default function AlquileresPage() {
   const [integrantes, setIntegrantes] = useState<IntegranteGrupo[]>([])
   const [loadingIntegrantes, setLoadingIntegrantes] = useState(false)
   const [buscarIntegrante, setBuscarIntegrante] = useState('')
+  const [showAgregarIntegrante, setShowAgregarIntegrante] = useState(false)
+  const [nuevoIntNombre, setNuevoIntNombre] = useState('')
+  const [nuevoIntGarantia, setNuevoIntGarantia] = useState('')
+  const [nuevoIntTipoGarantia, setNuevoIntTipoGarantia] = useState('ci_efectivo')
+  const [nuevoIntMetodoPago, setNuevoIntMetodoPago] = useState('efectivo')
+  const [nuevoIntMonto, setNuevoIntMonto] = useState('')
+  const [nuevoIntNotas, setNuevoIntNotas] = useState('')
+  const [agregandoInt, setAgregandoInt] = useState(false)
 
   const [reloadKey, setReloadKey] = useState(0)
   const reload = () => setReloadKey(k => k + 1)
@@ -174,6 +182,60 @@ export default function AlquileresPage() {
     })
 
     toast.success(nuevoEstado ? `${integrante.nombre} marcado como devuelto` : `${integrante.nombre} revertido`)
+  }
+
+  const agregarIntegrante = async () => {
+    if (!profile || !selected) return
+    if (!nuevoIntNombre.trim()) {
+      toast.error('Escribe el nombre del integrante')
+      return
+    }
+    if (!nuevoIntMonto || isNaN(Number(nuevoIntMonto))) {
+      toast.error('Escribe un monto valido')
+      return
+    }
+    setAgregandoInt(true)
+    const nuevoNumero = integrantes.length + 1
+    const { data, error } = await supabase.from('integrantes_grupo').insert({
+      alquiler_id: selected.id,
+      numero: nuevoNumero,
+      nombre: nuevoIntNombre.trim(),
+      garantia: nuevoIntGarantia.trim() || null,
+      tipo_garantia: nuevoIntTipoGarantia,
+      metodo_pago: nuevoIntMetodoPago,
+      prendas: [],
+      monto: Number(nuevoIntMonto),
+      notas: nuevoIntNotas.trim() || null,
+      devuelto: false,
+    }).select().single()
+
+    if (error) {
+      toast.error('Error al agregar integrante')
+      setAgregandoInt(false)
+      return
+    }
+
+    if (data) {
+      setIntegrantes(prev => [...prev, data])
+    }
+
+    await supabase.from('audit_log').insert({
+      usuario_id: profile.id,
+      usuario_nombre: profile.nombre,
+      accion: 'agregar_integrante',
+      detalle: `Nuevo integrante #${nuevoNumero}: ${nuevoIntNombre.trim()} al grupo ${selected.nombre_grupo || selected.nombre_cliente}`,
+      alquiler_id: selected.id,
+    })
+
+    toast.success(`Integrante ${nuevoIntNombre.trim()} agregado`)
+    setNuevoIntNombre('')
+    setNuevoIntGarantia('')
+    setNuevoIntTipoGarantia('ci_efectivo')
+    setNuevoIntMetodoPago('efectivo')
+    setNuevoIntMonto('')
+    setNuevoIntNotas('')
+    setShowAgregarIntegrante(false)
+    setAgregandoInt(false)
   }
 
   const [solicitandoRevertir, setSolicitandoRevertir] = useState<string | null>(null)
@@ -593,6 +655,70 @@ export default function AlquileresPage() {
                           )}
                         </div>
                       ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Agregar integrante a grupo existente */}
+              {selected.tipo === 'grupal' && selected.estado === 'pendiente' && (
+                <div className="mt-3">
+                  {!showAgregarIntegrante ? (
+                    <button
+                      onClick={() => setShowAgregarIntegrante(true)}
+                      className="w-full py-2.5 px-4 bg-guindo-700 text-white rounded-xl text-sm font-semibold hover:bg-guindo-800 flex items-center justify-center gap-2"
+                    >
+                      <FiUserPlus size={16} /> Agregar Integrante
+                    </button>
+                  ) : (
+                    <div className="p-4 bg-purple-50 border-2 border-purple-200 rounded-2xl space-y-3">
+                      <h4 className="text-sm font-bold text-purple-800 flex items-center gap-2">
+                        <FiUserPlus size={16} /> Nuevo Integrante #{integrantes.length + 1}
+                      </h4>
+                      <div>
+                        <label className="label-field">Nombre completo *</label>
+                        <input className="input-field" placeholder="Nombre del integrante" value={nuevoIntNombre} onChange={e => setNuevoIntNombre(e.target.value)} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="label-field">Metodo de pago</label>
+                          <select className="input-field" value={nuevoIntMetodoPago} onChange={e => setNuevoIntMetodoPago(e.target.value)}>
+                            <option value="efectivo">Efectivo</option>
+                            <option value="qr">QR</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="label-field">Monto (Bs.) *</label>
+                          <input className="input-field" type="number" placeholder="0" value={nuevoIntMonto} onChange={e => setNuevoIntMonto(e.target.value)} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="label-field">Garantia</label>
+                          <input className="input-field" placeholder="CI, efectivo, etc." value={nuevoIntGarantia} onChange={e => setNuevoIntGarantia(e.target.value)} />
+                        </div>
+                        <div>
+                          <label className="label-field">Tipo garantia</label>
+                          <select className="input-field" value={nuevoIntTipoGarantia} onChange={e => setNuevoIntTipoGarantia(e.target.value)}>
+                            <option value="ci_efectivo">CI + Efectivo</option>
+                            <option value="ci">CI</option>
+                            <option value="efectivo">Efectivo</option>
+                            <option value="qr">QR</option>
+                            <option value="prenda">Prenda</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="label-field">Notas (opcional)</label>
+                        <input className="input-field" placeholder="Observaciones..." value={nuevoIntNotas} onChange={e => setNuevoIntNotas(e.target.value)} />
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={agregarIntegrante} disabled={agregandoInt} className="btn-primary flex-1 text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                          {agregandoInt ? 'Guardando...' : 'Guardar Integrante'}
+                        </button>
+                        <button onClick={() => { setShowAgregarIntegrante(false); setNuevoIntNombre(''); setNuevoIntGarantia(''); setNuevoIntMonto(''); setNuevoIntNotas('') }}
+                          className="flex-1 py-2 px-4 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+                      </div>
                     </div>
                   )}
                 </div>
