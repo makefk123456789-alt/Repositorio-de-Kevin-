@@ -6,7 +6,8 @@ import { useAuth } from '@/components/AuthProvider'
 import ProtectedLayout from '@/components/ProtectedLayout'
 import { Alquiler, IntegranteGrupo } from '@/lib/types'
 import toast from 'react-hot-toast'
-import { FiSearch, FiCheck, FiX, FiAlertTriangle, FiPrinter, FiUserPlus } from 'react-icons/fi'
+import { FiSearch, FiCheck, FiX, FiAlertTriangle, FiPrinter, FiUserPlus, FiPlus, FiTrash2 } from 'react-icons/fi'
+import { Prenda } from '@/lib/types'
 
 export default function AlquileresPage() {
   const { profile, isAdmin } = useAuth()
@@ -28,6 +29,7 @@ export default function AlquileresPage() {
   const [nuevoIntMetodoPago, setNuevoIntMetodoPago] = useState('efectivo')
   const [nuevoIntMonto, setNuevoIntMonto] = useState('')
   const [nuevoIntNotas, setNuevoIntNotas] = useState('')
+  const [nuevoIntPrendas, setNuevoIntPrendas] = useState<Prenda[]>([{ nombre: '', cantidad: 1 }])
   const [agregandoInt, setAgregandoInt] = useState(false)
 
   const [reloadKey, setReloadKey] = useState(0)
@@ -203,7 +205,7 @@ export default function AlquileresPage() {
       garantia: nuevoIntGarantia.trim() || null,
       tipo_garantia: nuevoIntTipoGarantia,
       metodo_pago: nuevoIntMetodoPago,
-      prendas: [],
+      prendas: nuevoIntPrendas.filter(p => p.nombre.trim()),
       monto: Number(nuevoIntMonto),
       notas: nuevoIntNotas.trim() || null,
       devuelto: false,
@@ -234,6 +236,7 @@ export default function AlquileresPage() {
     setNuevoIntMetodoPago('efectivo')
     setNuevoIntMonto('')
     setNuevoIntNotas('')
+    setNuevoIntPrendas([{ nombre: '', cantidad: 1 }])
     setShowAgregarIntegrante(false)
     setAgregandoInt(false)
   }
@@ -617,6 +620,14 @@ export default function AlquileresPage() {
                               <p className="text-xs text-gray-500">
                                 Pago: {i.metodo_pago} | Garantia: {i.tipo_garantia || 'N/A'} | Bs. {i.monto}
                               </p>
+                              {i.prendas && i.prendas.length > 0 && (
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                  Prendas: {i.prendas.map((p: Prenda) => `${p.nombre}(x${p.cantidad})`).join(', ')}
+                                </p>
+                              )}
+                              {i.garantia && (
+                                <p className="text-xs text-gray-400">Garantia: {i.garantia}</p>
+                              )}
                               {i.devuelto && i.devuelto_fecha && (
                                 <p className="text-xs text-green-600 mt-0.5">
                                   Devolvio: {new Date(i.devuelto_fecha).toLocaleString('es-BO')}
@@ -709,6 +720,25 @@ export default function AlquileresPage() {
                         </div>
                       </div>
                       <div>
+                        <label className="label-field">Prendas que lleva</label>
+                        <div className="space-y-2">
+                          {nuevoIntPrendas.map((p, pi) => (
+                            <div key={pi} className="flex gap-2 items-center">
+                              <input className="input-field flex-1" placeholder="Nombre prenda" value={p.nombre}
+                                onChange={e => setNuevoIntPrendas(prev => prev.map((pr, i) => i === pi ? { ...pr, nombre: e.target.value } : pr))} />
+                              <input className="input-field w-16" type="number" min={1} value={p.cantidad}
+                                onChange={e => setNuevoIntPrendas(prev => prev.map((pr, i) => i === pi ? { ...pr, cantidad: Number(e.target.value) } : pr))} />
+                              {nuevoIntPrendas.length > 1 && (
+                                <button onClick={() => setNuevoIntPrendas(prev => prev.filter((_, i) => i !== pi))}
+                                  className="p-1 text-red-400 hover:text-red-600"><FiTrash2 size={14} /></button>
+                              )}
+                            </div>
+                          ))}
+                          <button onClick={() => setNuevoIntPrendas(prev => [...prev, { nombre: '', cantidad: 1 }])}
+                            className="text-xs text-guindo-700 hover:text-guindo-800 flex items-center gap-1"><FiPlus size={12} /> Otra prenda</button>
+                        </div>
+                      </div>
+                      <div>
                         <label className="label-field">Notas (opcional)</label>
                         <input className="input-field" placeholder="Observaciones..." value={nuevoIntNotas} onChange={e => setNuevoIntNotas(e.target.value)} />
                       </div>
@@ -716,7 +746,7 @@ export default function AlquileresPage() {
                         <button onClick={agregarIntegrante} disabled={agregandoInt} className="btn-primary flex-1 text-sm flex items-center justify-center gap-2 disabled:opacity-50">
                           {agregandoInt ? 'Guardando...' : 'Guardar Integrante'}
                         </button>
-                        <button onClick={() => { setShowAgregarIntegrante(false); setNuevoIntNombre(''); setNuevoIntGarantia(''); setNuevoIntMonto(''); setNuevoIntNotas('') }}
+                        <button onClick={() => { setShowAgregarIntegrante(false); setNuevoIntNombre(''); setNuevoIntGarantia(''); setNuevoIntMonto(''); setNuevoIntNotas(''); setNuevoIntPrendas([{ nombre: '', cantidad: 1 }]) }}
                           className="flex-1 py-2 px-4 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
                       </div>
                     </div>
