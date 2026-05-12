@@ -20,6 +20,7 @@ export default function AlquileresPage() {
   const [motivoEdicion, setMotivoEdicion] = useState('')
   const [integrantes, setIntegrantes] = useState<IntegranteGrupo[]>([])
   const [loadingIntegrantes, setLoadingIntegrantes] = useState(false)
+  const [buscarIntegrante, setBuscarIntegrante] = useState('')
 
   const [reloadKey, setReloadKey] = useState(0)
   const reload = () => setReloadKey(k => k + 1)
@@ -97,7 +98,10 @@ export default function AlquileresPage() {
   }
 
   const solicitarEdicion = async (alquiler: Alquiler) => {
-    if (!profile || !motivoEdicion.trim()) return
+    if (!profile || !motivoEdicion.trim()) {
+      toast.error('Escribe el motivo de la edicion')
+      return
+    }
     const { error } = await supabase.from('solicitudes_edicion').insert({
       alquiler_id: alquiler.id,
       tipo: 'edicion_alquiler',
@@ -105,9 +109,11 @@ export default function AlquileresPage() {
       solicitante_nombre: profile.nombre,
       motivo: motivoEdicion,
       estado: 'pendiente',
+      aprobada_usada: false,
     })
     if (error) {
-      toast.error('Error al enviar solicitud')
+      console.error('Error solicitud:', error)
+      toast.error('Error al enviar solicitud. Contacta al administrador.')
     } else {
       toast.success('Solicitud enviada al administrador')
       setSolicitandoEdicion(false)
@@ -133,6 +139,10 @@ export default function AlquileresPage() {
 
   const marcarIntegranteDevuelto = async (integrante: IntegranteGrupo) => {
     if (!profile) return
+    if (integrante.devuelto && !isAdmin) {
+      toast.error('Ya esta marcado como devuelto. Solicita edicion al administrador para revertir.')
+      return
+    }
     const nuevoEstado = !integrante.devuelto
     const { error } = await supabase
       .from('integrantes_grupo')
@@ -164,6 +174,32 @@ export default function AlquileresPage() {
     })
 
     toast.success(nuevoEstado ? `${integrante.nombre} marcado como devuelto` : `${integrante.nombre} revertido`)
+  }
+
+  const [solicitandoRevertir, setSolicitandoRevertir] = useState<string | null>(null)
+  const [motivoRevertir, setMotivoRevertir] = useState('')
+
+  const solicitarRevertirIntegrante = async (integrante: IntegranteGrupo) => {
+    if (!profile || !motivoRevertir.trim()) {
+      toast.error('Escribe el motivo para solicitar revertir')
+      return
+    }
+    const { error } = await supabase.from('solicitudes_edicion').insert({
+      alquiler_id: integrante.alquiler_id,
+      tipo: 'revertir_devolucion',
+      solicitante_id: profile.id,
+      solicitante_nombre: profile.nombre,
+      motivo: `Revertir devolucion de ${integrante.nombre}: ${motivoRevertir}`,
+      estado: 'pendiente',
+      aprobada_usada: false,
+    })
+    if (error) {
+      toast.error('Error al enviar solicitud. Contacta al administrador.')
+    } else {
+      toast.success('Solicitud enviada al administrador')
+      setSolicitandoRevertir(null)
+      setMotivoRevertir('')
+    }
   }
 
   const printAlquiler = (alquiler: Alquiler) => {
@@ -410,66 +446,154 @@ export default function AlquileresPage() {
                 {selected.notas && <Detail label="Notas" value={selected.notas} />}
               </div>
 
+              {/* Estado de devolucion - INDIVIDUAL */}
+              {selected.tipo === 'individual' && selected.estado === 'pendiente' && (
+                <div className="mt-4 p-4 bg-orange-50 border-2 border-orange-200 rounded-2xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+                      <FiAlertTriangle className="text-orange-600" size={20} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-orange-800">Pendiente de devolucion</p>
+                      <p className="text-xs text-orange-600">Fecha limite: {new Date(selected.fecha_devolucion).toLocaleDateString('es-BO')}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {selected.tipo === 'individual' && selected.estado === 'devuelto' && (
+                <div className="mt-4 p-4 bg-green-50 border-2 border-green-300 rounded-2xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+                      <FiCheck className="text-green-600" size={20} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-green-800">Devuelto</p>
+                      <p className="text-xs text-green-600">
+                        {selected.fecha_devuelto ? new Date(selected.fecha_devuelto).toLocaleString('es-BO') : ''}
+                        {selected.devuelto_por_nombre ? ` por ${selected.devuelto_por_nombre}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Integrantes del grupo con checkboxes individuales */}
               {selected.tipo === 'grupal' && (
                 <div className="mt-4">
-                  <h3 className="text-sm font-bold text-gray-800 mb-2">Integrantes del Grupo</h3>
+                  <h3 className="text-sm font-bold text-gray-800 mb-2">Integrantes del Grupo — Control de Devoluciones</h3>
+                  <p className="text-xs text-gray-500 mb-3">Marca a cada integrante cuando devuelva su ropa. Una vez marcado, no se puede deshacer sin solicitud al administrador.</p>
                   {loadingIntegrantes ? (
                     <div className="text-center py-3 text-gray-400 text-sm">Cargando integrantes...</div>
                   ) : integrantes.length === 0 ? (
                     <div className="text-center py-3 text-gray-400 text-sm">Sin integrantes registrados</div>
                   ) : (
                     <div className="space-y-2">
-                      <div className="text-xs text-gray-500 mb-1">
-                        {integrantes.filter(i => i.devuelto).length} de {integrantes.length} devolvieron
+                      {integrantes.length > 5 && (
+                        <div className="relative mb-2">
+                          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                          <input
+                            className="input-field pl-8 text-sm"
+                            placeholder="Buscar integrante por nombre..."
+                            value={buscarIntegrante}
+                            onChange={e => setBuscarIntegrante(e.target.value)}
+                          />
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-gray-700">
+                          {integrantes.filter(i => i.devuelto).length} de {integrantes.length} devolvieron
+                        </span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          integrantes.filter(i => i.devuelto).length === integrantes.length
+                            ? 'bg-green-200 text-green-800'
+                            : 'bg-orange-200 text-orange-800'
+                        }`}>
+                          {integrantes.filter(i => i.devuelto).length === integrantes.length ? 'TODOS DEVOLVIERON' : 'FALTAN DEVOLUCIONES'}
+                        </span>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+                      <div className="w-full bg-gray-200 rounded-full h-3 mb-3">
                         <div
-                          className="bg-green-500 h-2 rounded-full transition-all"
+                          className={`h-3 rounded-full transition-all ${
+                            integrantes.filter(i => i.devuelto).length === integrantes.length ? 'bg-green-500' : 'bg-orange-400'
+                          }`}
                           style={{ width: `${integrantes.length > 0 ? (integrantes.filter(i => i.devuelto).length / integrantes.length) * 100 : 0}%` }}
                         />
                       </div>
-                      {integrantes.map(i => (
-                        <div
-                          key={i.id}
-                          className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
-                            i.devuelto
-                              ? 'bg-green-50 border-green-300'
-                              : 'bg-orange-50 border-orange-200'
-                          }`}
-                        >
-                          <button
-                            onClick={() => marcarIntegranteDevuelto(i)}
-                            className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all shrink-0 ${
+                      {integrantes.filter(i =>
+                        !buscarIntegrante ||
+                        i.nombre.toLowerCase().includes(buscarIntegrante.toLowerCase()) ||
+                        i.numero.toString().includes(buscarIntegrante)
+                      ).map(i => (
+                        <div key={i.id}>
+                          <div
+                            className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
                               i.devuelto
-                                ? 'bg-green-500 border-green-500 text-white'
-                                : 'border-gray-300 hover:border-orange-400'
+                                ? 'bg-green-50 border-green-300'
+                                : 'bg-orange-50 border-orange-200'
                             }`}
                           >
-                            {i.devuelto && <FiCheck size={16} />}
-                          </button>
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-semibold ${
-                              i.devuelto ? 'line-through text-gray-400' : 'text-gray-800'
-                            }`}>
-                              {i.numero}. {i.nombre}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              Pago: {i.metodo_pago} | Garantia: {i.tipo_garantia || 'N/A'} | Bs. {i.monto}
-                            </p>
-                            {i.devuelto && i.devuelto_fecha && (
-                              <p className="text-xs text-green-600 mt-0.5">
-                                Devuelto: {new Date(i.devuelto_fecha).toLocaleString('es-BO')}
+                            <button
+                              onClick={() => {
+                                if (i.devuelto && !isAdmin) {
+                                  setSolicitandoRevertir(solicitandoRevertir === i.id ? null : i.id)
+                                  return
+                                }
+                                marcarIntegranteDevuelto(i)
+                              }}
+                              className={`w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-all shrink-0 ${
+                                i.devuelto
+                                  ? 'bg-green-500 border-green-500 text-white'
+                                  : 'border-orange-300 hover:border-orange-500 hover:bg-orange-100'
+                              }`}
+                              title={i.devuelto ? (isAdmin ? 'Clic para revertir' : 'Solicitar revertir al admin') : 'Marcar como devuelto'}
+                            >
+                              {i.devuelto && <FiCheck size={18} />}
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-bold ${
+                                i.devuelto ? 'line-through text-gray-400' : 'text-gray-800'
+                              }`}>
+                                {i.numero}. {i.nombre}
                               </p>
-                            )}
+                              <p className="text-xs text-gray-500">
+                                Pago: {i.metodo_pago} | Garantia: {i.tipo_garantia || 'N/A'} | Bs. {i.monto}
+                              </p>
+                              {i.devuelto && i.devuelto_fecha && (
+                                <p className="text-xs text-green-600 mt-0.5">
+                                  Devolvio: {new Date(i.devuelto_fecha).toLocaleString('es-BO')}
+                                </p>
+                              )}
+                            </div>
+                            <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                              i.devuelto
+                                ? 'bg-green-200 text-green-800'
+                                : 'bg-orange-200 text-orange-800'
+                            }`}>
+                              {i.devuelto ? 'DEVUELTO' : 'PENDIENTE'}
+                            </span>
                           </div>
-                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                            i.devuelto
-                              ? 'bg-green-200 text-green-800'
-                              : 'bg-orange-200 text-orange-800'
-                          }`}>
-                            {i.devuelto ? 'Devuelto' : 'Pendiente'}
-                          </span>
+                          {/* Formulario para solicitar revertir (solo workers) */}
+                          {solicitandoRevertir === i.id && !isAdmin && (
+                            <div className="ml-11 mt-1 p-3 bg-yellow-50 border border-yellow-200 rounded-xl space-y-2">
+                              <p className="text-xs font-semibold text-yellow-800">Solicitar revertir devolucion de {i.nombre}</p>
+                              <textarea
+                                className="input-field text-sm"
+                                rows={2}
+                                value={motivoRevertir}
+                                onChange={e => setMotivoRevertir(e.target.value)}
+                                placeholder="Explica por que necesitas revertir..."
+                              />
+                              <div className="flex gap-2">
+                                <button onClick={() => solicitarRevertirIntegrante(i)} className="btn-primary flex-1 text-xs">
+                                  Enviar Solicitud
+                                </button>
+                                <button onClick={() => { setSolicitandoRevertir(null); setMotivoRevertir('') }}
+                                  className="flex-1 py-1.5 px-3 border border-gray-200 rounded-xl text-xs text-gray-600 hover:bg-gray-50">
+                                  Cancelar
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -478,16 +602,16 @@ export default function AlquileresPage() {
               )}
 
               <div className="mt-4 space-y-2">
+                {selected.estado === 'pendiente' && selected.tipo === 'individual' && (
+                  <button onClick={() => marcarDevuelto(selected)} className="w-full py-3 px-4 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 flex items-center justify-center gap-2">
+                    <FiCheck size={18} /> Marcar como Devuelto
+                  </button>
+                )}
                 {selected.estado === 'pendiente' && (
-                  <div className="flex gap-2">
-                    <button onClick={() => marcarDevuelto(selected)} className="btn-primary flex-1 text-sm">
-                      Marcar Devuelto
-                    </button>
-                    <button onClick={() => marcarPerdida(selected)}
-                      className="flex-1 py-2 px-4 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700">
-                      Marcar Perdida
-                    </button>
-                  </div>
+                  <button onClick={() => marcarPerdida(selected)}
+                    className="w-full py-2 px-4 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700">
+                    Marcar como Perdida
+                  </button>
                 )}
 
                 <button onClick={() => printAlquiler(selected)}

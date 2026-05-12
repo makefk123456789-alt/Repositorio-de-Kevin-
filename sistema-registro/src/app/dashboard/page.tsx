@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import ProtectedLayout from '@/components/ProtectedLayout'
 import { Alquiler, IntegranteGrupo } from '@/lib/types'
-import { FiUsers, FiLayers, FiDollarSign, FiCreditCard, FiUserCheck, FiPackage } from 'react-icons/fi'
+import { FiUsers, FiLayers, FiDollarSign, FiCreditCard, FiUserCheck, FiPackage, FiSearch } from 'react-icons/fi'
 import Link from 'next/link'
 
 interface DashboardStats {
@@ -35,6 +35,7 @@ export default function DashboardPage() {
   const [recentAlquileres, setRecentAlquileres] = useState<Alquiler[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedAlquiler, setSelectedAlquiler] = useState<Alquiler | null>(null)
+  const [busqueda, setBusqueda] = useState('')
 
   useEffect(() => {
     let active = true
@@ -197,11 +198,22 @@ export default function DashboardPage() {
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                 <h2 className="text-lg font-semibold text-gray-800">Ultimos Registros</h2>
-                <Link href="/alquileres" className="text-sm text-guindo-700 hover:underline font-medium">
-                  Ver todos
-                </Link>
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                    <input
+                      className="input-field pl-8 !w-48 text-sm"
+                      placeholder="Buscar cliente..."
+                      value={busqueda}
+                      onChange={e => setBusqueda(e.target.value)}
+                    />
+                  </div>
+                  <Link href="/alquileres" className="text-sm text-guindo-700 hover:underline font-medium">
+                    Ver todos
+                  </Link>
+                </div>
               </div>
               <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
@@ -217,7 +229,12 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {recentAlquileres.map(a => (
+                      {recentAlquileres.filter(a =>
+                        !busqueda ||
+                        a.nombre_cliente.toLowerCase().includes(busqueda.toLowerCase()) ||
+                        a.danza.toLowerCase().includes(busqueda.toLowerCase()) ||
+                        a.codigo?.toString().includes(busqueda)
+                      ).map(a => (
                         <tr
                           key={a.id}
                           className="hover:bg-gray-50 cursor-pointer"
