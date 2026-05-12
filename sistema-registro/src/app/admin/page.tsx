@@ -8,6 +8,7 @@ import { Profile, AuditLog, SolicitudEdicion } from '@/lib/types'
 import toast from 'react-hot-toast'
 import { FiEye, FiEyeOff, FiCheck, FiX, FiUserPlus } from 'react-icons/fi'
 import { createClient } from '@supabase/supabase-js'
+import ConfirmModal from '@/components/ConfirmModal'
 
 export default function AdminPage() {
   const { profile, isAdmin } = useAuth()
@@ -23,6 +24,8 @@ export default function AdminPage() {
   const [nuevoPassword, setNuevoPassword] = useState('')
   const [nuevoRol, setNuevoRol] = useState<'worker' | 'admin'>('worker')
   const [creando, setCreando] = useState(false)
+
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; message: string; title?: string; type?: 'warning' | 'danger' | 'info' } | null>(null)
 
   const [reloadKey, setReloadKey] = useState(0)
   const reload = () => setReloadKey(k => k + 1)
@@ -363,7 +366,12 @@ export default function AdminPage() {
                         </td>
                         <td className="px-4 py-3 text-center">
                           <button
-                            onClick={() => toggleUserStatus(u)}
+                            onClick={() => setConfirmAction({
+                              action: () => toggleUserStatus(u),
+                              message: `¿Estas seguro de ${u.activo ? 'DESACTIVAR' : 'ACTIVAR'} al usuario ${u.nombre}?`,
+                              title: u.activo ? '¿Desactivar usuario?' : '¿Activar usuario?',
+                              type: u.activo ? 'danger' : 'info',
+                            })}
                             className={`px-3 py-1 rounded-lg text-xs font-medium ${
                               u.activo
                                 ? 'bg-red-100 text-red-700 hover:bg-red-200'
@@ -454,14 +462,24 @@ export default function AdminPage() {
                           {s.estado === 'pendiente' && (
                             <div className="flex items-center justify-center gap-1">
                               <button
-                                onClick={() => aprobarSolicitud(s)}
+                                onClick={() => setConfirmAction({
+                                  action: () => aprobarSolicitud(s),
+                                  message: `¿Estas seguro de APROBAR la solicitud de ${s.solicitante_nombre}?\n\nMotivo: ${s.motivo}`,
+                                  title: '¿Aprobar solicitud?',
+                                  type: 'info',
+                                })}
                                 className="p-1.5 rounded-lg hover:bg-green-100 text-green-600"
                                 title="Aprobar"
                               >
                                 <FiCheck size={16} />
                               </button>
                               <button
-                                onClick={() => rechazarSolicitud(s)}
+                                onClick={() => setConfirmAction({
+                                  action: () => rechazarSolicitud(s),
+                                  message: `¿Estas seguro de RECHAZAR la solicitud de ${s.solicitante_nombre}?`,
+                                  title: '¿Rechazar solicitud?',
+                                  type: 'danger',
+                                })}
                                 className="p-1.5 rounded-lg hover:bg-red-100 text-red-600"
                                 title="Rechazar"
                               >
@@ -485,6 +503,16 @@ export default function AdminPage() {
             )}
           </>
         )}
+        <ConfirmModal
+          open={!!confirmAction}
+          title={confirmAction?.title}
+          message={confirmAction?.message || ''}
+          type={confirmAction?.type}
+          confirmText="Confirmar"
+          cancelText="Cancelar"
+          onConfirm={() => { confirmAction?.action(); setConfirmAction(null) }}
+          onCancel={() => setConfirmAction(null)}
+        />
       </div>
     </ProtectedLayout>
   )

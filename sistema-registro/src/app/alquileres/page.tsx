@@ -8,6 +8,7 @@ import { Alquiler, IntegranteGrupo } from '@/lib/types'
 import toast from 'react-hot-toast'
 import { FiSearch, FiCheck, FiX, FiAlertTriangle, FiPrinter, FiUserPlus, FiPlus, FiTrash2 } from 'react-icons/fi'
 import { Prenda } from '@/lib/types'
+import ConfirmModal from '@/components/ConfirmModal'
 
 export default function AlquileresPage() {
   const { profile, isAdmin } = useAuth()
@@ -31,6 +32,8 @@ export default function AlquileresPage() {
   const [nuevoIntNotas, setNuevoIntNotas] = useState('')
   const [nuevoIntPrendas, setNuevoIntPrendas] = useState<Prenda[]>([{ nombre: '', cantidad: 1 }])
   const [agregandoInt, setAgregandoInt] = useState(false)
+
+  const [confirmAction, setConfirmAction] = useState<{ action: () => void; message: string; title?: string; type?: 'warning' | 'danger' | 'info' } | null>(null)
 
   const [reloadKey, setReloadKey] = useState(0)
   const reload = () => setReloadKey(k => k + 1)
@@ -112,22 +115,30 @@ export default function AlquileresPage() {
       toast.error('Escribe el motivo de la edicion')
       return
     }
-    const { error } = await supabase.from('solicitudes_edicion').insert({
-      alquiler_id: alquiler.id,
-      tipo: 'edicion_alquiler',
-      solicitante_id: profile.id,
-      solicitante_nombre: profile.nombre,
-      motivo: motivoEdicion,
-      estado: 'pendiente',
-      aprobada_usada: false,
-    })
-    if (error) {
-      console.error('Error solicitud:', error)
-      toast.error('Error al enviar solicitud. Contacta al administrador.')
-    } else {
-      toast.success('Solicitud enviada al administrador')
-      setSolicitandoEdicion(false)
-      setMotivoEdicion('')
+    try {
+      const insertData: Record<string, unknown> = {
+        tipo: 'edicion_alquiler',
+        solicitante_id: profile.id,
+        solicitante_nombre: profile.nombre,
+        motivo: motivoEdicion,
+        estado: 'pendiente',
+        aprobada_usada: false,
+      }
+      if (alquiler.id) {
+        insertData.alquiler_id = alquiler.id
+      }
+      const { error } = await supabase.from('solicitudes_edicion').insert(insertData)
+      if (error) {
+        console.error('Error solicitud:', error)
+        toast.error(`Error: ${error.message}`)
+      } else {
+        toast.success('Solicitud enviada al administrador')
+        setSolicitandoEdicion(false)
+        setMotivoEdicion('')
+      }
+    } catch (err) {
+      console.error('Error inesperado:', err)
+      toast.error('Error inesperado al enviar solicitud')
     }
   }
 
@@ -265,21 +276,30 @@ export default function AlquileresPage() {
       toast.error('Escribe el motivo para solicitar revertir')
       return
     }
-    const { error } = await supabase.from('solicitudes_edicion').insert({
-      alquiler_id: integrante.alquiler_id,
-      tipo: 'revertir_devolucion',
-      solicitante_id: profile.id,
-      solicitante_nombre: profile.nombre,
-      motivo: `Revertir devolucion de ${integrante.nombre}: ${motivoRevertir}`,
-      estado: 'pendiente',
-      aprobada_usada: false,
-    })
-    if (error) {
-      toast.error('Error al enviar solicitud. Contacta al administrador.')
-    } else {
-      toast.success('Solicitud enviada al administrador')
-      setSolicitandoRevertir(null)
-      setMotivoRevertir('')
+    try {
+      const insertData: Record<string, unknown> = {
+        tipo: 'revertir_devolucion',
+        solicitante_id: profile.id,
+        solicitante_nombre: profile.nombre,
+        motivo: `Revertir devolucion de ${integrante.nombre}: ${motivoRevertir}`,
+        estado: 'pendiente',
+        aprobada_usada: false,
+      }
+      if (integrante.alquiler_id) {
+        insertData.alquiler_id = integrante.alquiler_id
+      }
+      const { error } = await supabase.from('solicitudes_edicion').insert(insertData)
+      if (error) {
+        console.error('Error solicitud revertir:', error)
+        toast.error(`Error: ${error.message}`)
+      } else {
+        toast.success('Solicitud enviada al administrador')
+        setSolicitandoRevertir(null)
+        setMotivoRevertir('')
+      }
+    } catch (err) {
+      console.error('Error inesperado:', err)
+      toast.error('Error inesperado al enviar solicitud')
     }
   }
 
@@ -557,12 +577,17 @@ export default function AlquileresPage() {
                       </div>
                     </div>
                     <button
-                      onClick={() => marcarDevuelto(selected)}
+                      onClick={() => setConfirmAction({
+                        action: () => marcarDevuelto(selected),
+                        message: `¿Estas seguro de registrar la devolucion de ${selected.nombre_cliente}? Esta accion cambiara el estado a "Devuelto".`,
+                        title: '¿Registrar devolucion?',
+                        type: 'warning',
+                      })}
                       className="w-full py-4 px-6 bg-orange-500 text-white rounded-2xl text-lg font-black hover:bg-orange-600 active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-lg"
                     >
                       <FiCheck size={24} /> REGISTRAR DEVOLUCION
                     </button>
-                    <p className="text-center text-xs text-gray-400 mt-2">Al presionar, el alquiler cambiara a estado "Devuelto"</p>
+                    <p className="text-center text-xs text-gray-400 mt-2">Al presionar, el alquiler cambiara a estado Devuelto</p>
                   </div>
                 </div>
               )}
@@ -646,7 +671,21 @@ export default function AlquileresPage() {
                                   setSolicitandoRevertir(solicitandoRevertir === i.id ? null : i.id)
                                   return
                                 }
-                                marcarIntegranteDevuelto(i)
+                                if (i.devuelto && isAdmin) {
+                                  setConfirmAction({
+                                    action: () => marcarIntegranteDevuelto(i),
+                                    message: `¿Estas seguro de REVERTIR la devolucion de ${i.nombre}?`,
+                                    title: '¿Revertir devolucion?',
+                                    type: 'danger',
+                                  })
+                                  return
+                                }
+                                setConfirmAction({
+                                  action: () => marcarIntegranteDevuelto(i),
+                                  message: `¿Estas seguro de marcar a "${i.nombre}" como devuelto?`,
+                                  title: '¿Registrar devolucion?',
+                                  type: 'warning',
+                                })
                               }}
                               className={`w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-all shrink-0 ${
                                 i.devuelto
@@ -807,7 +846,12 @@ export default function AlquileresPage() {
                 <div className="mt-3">
                   {integrantes.every(i => i.devuelto) ? (
                     <button
-                      onClick={() => marcarDevuelto(selected)}
+                      onClick={() => setConfirmAction({
+                        action: () => marcarDevuelto(selected),
+                        message: `¿Estas seguro de registrar la devolucion del grupo "${selected.nombre_grupo || selected.nombre_cliente}"? Todos los integrantes ya devolvieron.`,
+                        title: '¿Registrar devolucion del grupo?',
+                        type: 'warning',
+                      })}
                       className="w-full py-4 px-6 bg-orange-500 text-white rounded-2xl text-lg font-black hover:bg-orange-600 active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-lg"
                     >
                       <FiCheck size={24} /> REGISTRAR DEVOLUCION DEL GRUPO
@@ -822,7 +866,12 @@ export default function AlquileresPage() {
 
               <div className="mt-4 space-y-2">
                 {selected.estado === 'pendiente' && (
-                  <button onClick={() => marcarPerdida(selected)}
+                  <button onClick={() => setConfirmAction({
+                    action: () => marcarPerdida(selected),
+                    message: `¿Estas seguro de marcar como PERDIDA el alquiler de ${selected.nombre_cliente}? Esta accion indica que las prendas no fueron devueltas.`,
+                    title: '¿Marcar como perdida?',
+                    type: 'danger',
+                  })}
                     className="w-full py-2 px-4 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700">
                     Marcar como Perdida
                   </button>
@@ -865,6 +914,17 @@ export default function AlquileresPage() {
             </div>
           </div>
         )}
+
+        <ConfirmModal
+          open={!!confirmAction}
+          title={confirmAction?.title}
+          message={confirmAction?.message || ''}
+          type={confirmAction?.type}
+          confirmText="Confirmar"
+          cancelText="Cancelar"
+          onConfirm={() => { confirmAction?.action(); setConfirmAction(null) }}
+          onCancel={() => setConfirmAction(null)}
+        />
       </div>
     </ProtectedLayout>
   )

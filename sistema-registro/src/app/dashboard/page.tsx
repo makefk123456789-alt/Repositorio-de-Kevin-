@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import ProtectedLayout from '@/components/ProtectedLayout'
 import { Alquiler, IntegranteGrupo } from '@/lib/types'
-import { FiUsers, FiLayers, FiDollarSign, FiCreditCard, FiUserCheck, FiPackage, FiSearch, FiAlertCircle, FiClock, FiCheckCircle } from 'react-icons/fi'
+import { FiUsers, FiLayers, FiDollarSign, FiCreditCard, FiPackage, FiSearch, FiAlertCircle, FiClock, FiCheckCircle } from 'react-icons/fi'
 import Link from 'next/link'
 
 interface DashboardStats {

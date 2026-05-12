@@ -7,7 +7,7 @@ import { useAuth } from './AuthProvider'
 import {
   FiHome, FiFileText, FiList, FiDollarSign,
   FiSettings, FiLogOut, FiMessageSquare, FiMenu, FiX,
-  FiAlertTriangle, FiShoppingBag, FiActivity, FiUsers
+  FiAlertTriangle, FiShoppingBag, FiActivity, FiUsers, FiBook
 } from 'react-icons/fi'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -22,6 +22,7 @@ const navItems = [
   { href: '/perdidas', label: 'Perdidas de Prendas', icon: FiAlertTriangle },
   { href: '/chat', label: 'Chat Equipo', icon: FiMessageSquare },
   { href: '/historial', label: 'Historial Operaciones', icon: FiActivity },
+  { href: '/manual', label: 'Manual de Instrucciones', icon: FiBook },
 ]
 
 const adminItems = [
