@@ -533,31 +533,52 @@ export default function AlquileresPage() {
                 {selected.notas && <Detail label="Notas" value={selected.notas} />}
               </div>
 
-              {/* Estado de devolucion - INDIVIDUAL */}
+              {/* BOTON GRANDE DE DEVOLUCION - INDIVIDUAL */}
               {selected.tipo === 'individual' && selected.estado === 'pendiente' && (
-                <div className="mt-4 p-4 bg-orange-50 border-2 border-orange-200 rounded-2xl">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
-                      <FiAlertTriangle className="text-orange-600" size={20} />
+                <div className="mt-4 space-y-3">
+                  <div className={`p-4 rounded-2xl border-2 ${
+                    isOverdue(selected)
+                      ? 'bg-red-50 border-red-300'
+                      : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                        isOverdue(selected) ? 'bg-red-100' : 'bg-gray-100'
+                      }`}>
+                        <FiAlertTriangle className={isOverdue(selected) ? 'text-red-600' : 'text-gray-500'} size={20} />
+                      </div>
+                      <div>
+                        <p className={`text-sm font-bold ${isOverdue(selected) ? 'text-red-800' : 'text-gray-700'}`}>
+                          {isOverdue(selected) ? 'VENCIDO — No devolvio aun' : 'Pendiente de devolucion'}
+                        </p>
+                        <p className={`text-xs ${isOverdue(selected) ? 'text-red-600' : 'text-gray-500'}`}>
+                          Fecha limite: {new Date(selected.fecha_devolucion).toLocaleDateString('es-BO')}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-bold text-orange-800">Pendiente de devolucion</p>
-                      <p className="text-xs text-orange-600">Fecha limite: {new Date(selected.fecha_devolucion).toLocaleDateString('es-BO')}</p>
-                    </div>
+                    <button
+                      onClick={() => marcarDevuelto(selected)}
+                      className="w-full py-4 px-6 bg-orange-500 text-white rounded-2xl text-lg font-black hover:bg-orange-600 active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-lg"
+                    >
+                      <FiCheck size={24} /> REGISTRAR DEVOLUCION
+                    </button>
+                    <p className="text-center text-xs text-gray-400 mt-2">Al presionar, el alquiler cambiara a estado "Devuelto"</p>
                   </div>
                 </div>
               )}
               {selected.tipo === 'individual' && selected.estado === 'devuelto' && (
-                <div className="mt-4 p-4 bg-green-50 border-2 border-green-300 rounded-2xl">
+                <div className="mt-4 p-4 bg-orange-50 border-2 border-orange-300 rounded-2xl">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
-                      <FiCheck className="text-green-600" size={20} />
+                    <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+                      <FiCheck className="text-orange-600" size={20} />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-green-800">Devuelto</p>
-                      <p className="text-xs text-green-600">
-                        {selected.fecha_devuelto ? new Date(selected.fecha_devuelto).toLocaleString('es-BO') : ''}
-                        {selected.devuelto_por_nombre ? ` por ${selected.devuelto_por_nombre}` : ''}
+                      <p className="text-sm font-bold text-orange-800">DEVUELTO</p>
+                      <p className="text-xs text-orange-600">
+                        {selected.fecha_devuelto ? `Fecha: ${new Date(selected.fecha_devuelto).toLocaleString('es-BO')}` : ''}
+                      </p>
+                      <p className="text-xs text-orange-600">
+                        {selected.devuelto_por_nombre ? `Registrado por: ${selected.devuelto_por_nombre}` : ''}
                       </p>
                     </div>
                   </div>
@@ -781,12 +802,25 @@ export default function AlquileresPage() {
                 </div>
               )}
 
+              {/* BOTON DEVOLUCION GRUPAL - cuando todos los integrantes devolvieron */}
+              {selected.tipo === 'grupal' && selected.estado === 'pendiente' && integrantes.length > 0 && (
+                <div className="mt-3">
+                  {integrantes.every(i => i.devuelto) ? (
+                    <button
+                      onClick={() => marcarDevuelto(selected)}
+                      className="w-full py-4 px-6 bg-orange-500 text-white rounded-2xl text-lg font-black hover:bg-orange-600 active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-lg"
+                    >
+                      <FiCheck size={24} /> REGISTRAR DEVOLUCION DEL GRUPO
+                    </button>
+                  ) : (
+                    <div className="p-3 bg-gray-50 border-2 border-gray-200 rounded-2xl text-center">
+                      <p className="text-sm text-gray-500">Marca a todos los integrantes como devueltos para registrar la devolucion del grupo completo</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="mt-4 space-y-2">
-                {selected.estado === 'pendiente' && selected.tipo === 'individual' && (
-                  <button onClick={() => marcarDevuelto(selected)} className="w-full py-3 px-4 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 flex items-center justify-center gap-2">
-                    <FiCheck size={18} /> Marcar como Devuelto
-                  </button>
-                )}
                 {selected.estado === 'pendiente' && (
                   <button onClick={() => marcarPerdida(selected)}
                     className="w-full py-2 px-4 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700">
