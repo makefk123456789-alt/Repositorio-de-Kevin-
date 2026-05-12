@@ -59,6 +59,9 @@ export interface IntegranteGrupo {
   prendas: Prenda[]
   monto: number
   notas: string | null
+  devuelto: boolean
+  devuelto_fecha: string | null
+  devuelto_por: string | null
   created_at: string
 }
 

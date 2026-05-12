@@ -237,15 +237,15 @@ export default function DashboardPage() {
                           <td className="px-4 py-3 text-gray-600">{a.danza}</td>
                           <td className="px-4 py-3">
                             {a.estado === 'pendiente' ? (
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                                 isOverdue(a)
-                                  ? 'bg-yellow-200 text-yellow-800'
-                                  : 'bg-green-100 text-green-700'
+                                  ? 'bg-yellow-300 text-yellow-900'
+                                  : 'bg-orange-100 text-orange-700'
                               }`}>
                                 Alquiler Activo
                               </span>
                             ) : (
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                                 a.estado === 'devuelto' ? 'bg-green-100 text-green-700' :
                                 a.estado === 'perdida' ? 'bg-red-100 text-red-700' :
                                 'bg-red-100 text-red-700'

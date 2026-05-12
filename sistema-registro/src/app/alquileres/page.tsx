@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import ProtectedLayout from '@/components/ProtectedLayout'
-import { Alquiler } from '@/lib/types'
+import { Alquiler, IntegranteGrupo } from '@/lib/types'
 import toast from 'react-hot-toast'
 import { FiSearch, FiCheck, FiEye, FiX, FiAlertTriangle, FiPrinter } from 'react-icons/fi'
 
@@ -18,6 +18,8 @@ export default function AlquileresPage() {
   const [selected, setSelected] = useState<Alquiler | null>(null)
   const [solicitandoEdicion, setSolicitandoEdicion] = useState(false)
   const [motivoEdicion, setMotivoEdicion] = useState('')
+  const [integrantes, setIntegrantes] = useState<IntegranteGrupo[]>([])
+  const [loadingIntegrantes, setLoadingIntegrantes] = useState(false)
 
   const [reloadKey, setReloadKey] = useState(0)
   const reload = () => setReloadKey(k => k + 1)
@@ -111,6 +113,57 @@ export default function AlquileresPage() {
       setSolicitandoEdicion(false)
       setMotivoEdicion('')
     }
+  }
+
+  const openDetail = async (alquiler: Alquiler) => {
+    setSelected(alquiler)
+    if (alquiler.tipo === 'grupal') {
+      setLoadingIntegrantes(true)
+      const { data } = await supabase
+        .from('integrantes_grupo')
+        .select('*')
+        .eq('alquiler_id', alquiler.id)
+        .order('numero', { ascending: true })
+      setIntegrantes(data || [])
+      setLoadingIntegrantes(false)
+    } else {
+      setIntegrantes([])
+    }
+  }
+
+  const marcarIntegranteDevuelto = async (integrante: IntegranteGrupo) => {
+    if (!profile) return
+    const nuevoEstado = !integrante.devuelto
+    const { error } = await supabase
+      .from('integrantes_grupo')
+      .update({
+        devuelto: nuevoEstado,
+        devuelto_fecha: nuevoEstado ? new Date().toISOString() : null,
+        devuelto_por: nuevoEstado ? profile.id : null,
+      })
+      .eq('id', integrante.id)
+
+    if (error) {
+      toast.error('Error al actualizar integrante')
+      return
+    }
+
+    setIntegrantes(prev =>
+      prev.map(i => i.id === integrante.id
+        ? { ...i, devuelto: nuevoEstado, devuelto_fecha: nuevoEstado ? new Date().toISOString() : null, devuelto_por: nuevoEstado ? profile.id : null }
+        : i
+      )
+    )
+
+    await supabase.from('audit_log').insert({
+      usuario_id: profile.id,
+      usuario_nombre: profile.nombre,
+      accion: nuevoEstado ? 'devolucion_integrante' : 'revertir_devolucion_integrante',
+      detalle: `${nuevoEstado ? 'Devuelto' : 'Revertido'}: ${integrante.nombre} del grupo`,
+      alquiler_id: integrante.alquiler_id,
+    })
+
+    toast.success(nuevoEstado ? `${integrante.nombre} marcado como devuelto` : `${integrante.nombre} revertido`)
   }
 
   const printAlquiler = (alquiler: Alquiler) => {
@@ -260,19 +313,19 @@ export default function AlquileresPage() {
                       </td>
                       <td className="px-4 py-3">
                         {a.estado === 'pendiente' ? (
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                             isOverdue(a)
-                              ? 'bg-yellow-200 text-yellow-800'
-                              : 'bg-green-100 text-green-700'
+                              ? 'bg-yellow-300 text-yellow-900'
+                              : 'bg-orange-100 text-orange-700'
                           }`}>
                             Alquiler Activo
                           </span>
                         ) : (
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                             a.estado === 'devuelto' ? 'bg-green-100 text-green-700' :
                             'bg-red-100 text-red-700'
                           }`}>
-                            {a.estado}
+                            {a.estado === 'devuelto' ? 'Devuelto' : a.estado}
                           </span>
                         )}
                       </td>
@@ -280,7 +333,7 @@ export default function AlquileresPage() {
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button
-                            onClick={() => setSelected(a)}
+                            onClick={() => openDetail(a)}
                             className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
                             title="Ver detalle"
                           >
@@ -356,6 +409,73 @@ export default function AlquileresPage() {
                 <Detail label="Registrado por" value={selected.registrado_por_nombre} />
                 {selected.notas && <Detail label="Notas" value={selected.notas} />}
               </div>
+
+              {/* Integrantes del grupo con checkboxes individuales */}
+              {selected.tipo === 'grupal' && (
+                <div className="mt-4">
+                  <h3 className="text-sm font-bold text-gray-800 mb-2">Integrantes del Grupo</h3>
+                  {loadingIntegrantes ? (
+                    <div className="text-center py-3 text-gray-400 text-sm">Cargando integrantes...</div>
+                  ) : integrantes.length === 0 ? (
+                    <div className="text-center py-3 text-gray-400 text-sm">Sin integrantes registrados</div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="text-xs text-gray-500 mb-1">
+                        {integrantes.filter(i => i.devuelto).length} de {integrantes.length} devolvieron
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+                        <div
+                          className="bg-green-500 h-2 rounded-full transition-all"
+                          style={{ width: `${integrantes.length > 0 ? (integrantes.filter(i => i.devuelto).length / integrantes.length) * 100 : 0}%` }}
+                        />
+                      </div>
+                      {integrantes.map(i => (
+                        <div
+                          key={i.id}
+                          className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
+                            i.devuelto
+                              ? 'bg-green-50 border-green-300'
+                              : 'bg-orange-50 border-orange-200'
+                          }`}
+                        >
+                          <button
+                            onClick={() => marcarIntegranteDevuelto(i)}
+                            className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all shrink-0 ${
+                              i.devuelto
+                                ? 'bg-green-500 border-green-500 text-white'
+                                : 'border-gray-300 hover:border-orange-400'
+                            }`}
+                          >
+                            {i.devuelto && <FiCheck size={16} />}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-semibold ${
+                              i.devuelto ? 'line-through text-gray-400' : 'text-gray-800'
+                            }`}>
+                              {i.numero}. {i.nombre}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Pago: {i.metodo_pago} | Garantia: {i.tipo_garantia || 'N/A'} | Bs. {i.monto}
+                            </p>
+                            {i.devuelto && i.devuelto_fecha && (
+                              <p className="text-xs text-green-600 mt-0.5">
+                                Devuelto: {new Date(i.devuelto_fecha).toLocaleString('es-BO')}
+                              </p>
+                            )}
+                          </div>
+                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                            i.devuelto
+                              ? 'bg-green-200 text-green-800'
+                              : 'bg-orange-200 text-orange-800'
+                          }`}>
+                            {i.devuelto ? 'Devuelto' : 'Pendiente'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="mt-4 space-y-2">
                 {selected.estado === 'pendiente' && (
