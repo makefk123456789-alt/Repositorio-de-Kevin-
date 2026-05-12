@@ -198,18 +198,33 @@ export default function AlquileresPage() {
     }
     setAgregandoInt(true)
     const nuevoNumero = integrantes.length + 1
-    const { data, error } = await supabase.from('integrantes_grupo').insert({
+    const insertData: Record<string, unknown> = {
       alquiler_id: selected.id,
       numero: nuevoNumero,
       nombre: nuevoIntNombre.trim(),
-      garantia: nuevoIntGarantia.trim() || null,
-      tipo_garantia: nuevoIntTipoGarantia,
+      garantia: nuevoIntGarantia.trim() ? `${nuevoIntGarantia.trim()} (${nuevoIntTipoGarantia})` : null,
       metodo_pago: nuevoIntMetodoPago,
       prendas: nuevoIntPrendas.filter(p => p.nombre.trim()),
       monto: Number(nuevoIntMonto),
       notas: nuevoIntNotas.trim() || null,
       devuelto: false,
+    }
+
+    // Try with tipo_garantia column first, fallback without it
+    let data, error
+    const res1 = await supabase.from('integrantes_grupo').insert({
+      ...insertData,
+      tipo_garantia: nuevoIntTipoGarantia,
     }).select().single()
+
+    if (res1.error && res1.error.message.includes('tipo_garantia')) {
+      const res2 = await supabase.from('integrantes_grupo').insert(insertData).select().single()
+      data = res2.data
+      error = res2.error
+    } else {
+      data = res1.data
+      error = res1.error
+    }
 
     if (error) {
       console.error('Error agregar integrante:', error)
