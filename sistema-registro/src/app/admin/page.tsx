@@ -6,7 +6,8 @@ import { useAuth } from '@/components/AuthProvider'
 import ProtectedLayout from '@/components/ProtectedLayout'
 import { Profile, AuditLog, SolicitudEdicion } from '@/lib/types'
 import toast from 'react-hot-toast'
-import { FiEye, FiEyeOff, FiCheck, FiX } from 'react-icons/fi'
+import { FiEye, FiEyeOff, FiCheck, FiX, FiUserPlus } from 'react-icons/fi'
+import { createClient } from '@supabase/supabase-js'
 
 export default function AdminPage() {
   const { profile, isAdmin } = useAuth()
@@ -16,6 +17,12 @@ export default function AdminPage() {
   const [solicitudes, setSolicitudes] = useState<SolicitudEdicion[]>([])
   const [loading, setLoading] = useState(true)
   const [passwordVisible, setPasswordVisible] = useState<Record<string, boolean>>({})
+  const [showCrearUsuario, setShowCrearUsuario] = useState(false)
+  const [nuevoNombre, setNuevoNombre] = useState('')
+  const [nuevoEmail, setNuevoEmail] = useState('')
+  const [nuevoPassword, setNuevoPassword] = useState('')
+  const [nuevoRol, setNuevoRol] = useState<'worker' | 'admin'>('worker')
+  const [creando, setCreando] = useState(false)
 
   const [reloadKey, setReloadKey] = useState(0)
   const reload = () => setReloadKey(k => k + 1)
@@ -119,6 +126,65 @@ export default function AdminPage() {
     reload()
   }
 
+  const crearUsuario = async () => {
+    if (!profile) return
+    if (!nuevoNombre.trim() || !nuevoEmail.trim() || !nuevoPassword.trim()) {
+      toast.error('Completa todos los campos')
+      return
+    }
+    if (nuevoPassword.length < 6) {
+      toast.error('La contrasena debe tener al menos 6 caracteres')
+      return
+    }
+    setCreando(true)
+
+    const signupClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://evppovogdwivjlmvmlrk.supabase.co',
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2cHBvdm9nZHdpdmpsbXZtbHJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NjgxNTEsImV4cCI6MjA5NDA0NDE1MX0.R1tBujBLRGZElWmjPnlhPdLE5ULJ0r2v15wpZvDmyFo',
+      { auth: { persistSession: false, autoRefreshToken: false } }
+    )
+
+    const { data, error } = await signupClient.auth.signUp({
+      email: nuevoEmail.trim(),
+      password: nuevoPassword.trim(),
+      options: {
+        data: {
+          nombre: nuevoNombre.trim(),
+          role: nuevoRol,
+        }
+      }
+    })
+
+    if (error) {
+      toast.error(`Error: ${error.message}`)
+      setCreando(false)
+      return
+    }
+
+    if (data.user) {
+      await supabase
+        .from('profiles')
+        .update({ contrasena_visible: nuevoPassword.trim() })
+        .eq('id', data.user.id)
+
+      await supabase.from('audit_log').insert({
+        usuario_id: profile.id,
+        usuario_nombre: profile.nombre,
+        accion: 'crear_usuario',
+        detalle: `Nuevo ${nuevoRol}: ${nuevoNombre.trim()} (${nuevoEmail.trim()})`,
+      })
+    }
+
+    toast.success(`${nuevoRol === 'admin' ? 'Administrador' : 'Trabajador'} creado exitosamente`)
+    setNuevoNombre('')
+    setNuevoEmail('')
+    setNuevoPassword('')
+    setNuevoRol('worker')
+    setShowCrearUsuario(false)
+    setCreando(false)
+    reload()
+  }
+
   if (!isAdmin) {
     return (
       <ProtectedLayout>
@@ -165,6 +231,89 @@ export default function AdminPage() {
         ) : (
           <>
             {tab === 'usuarios' && (
+              <>
+              {/* Boton crear usuario */}
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowCrearUsuario(!showCrearUsuario)}
+                  className="flex items-center gap-2 px-4 py-2 bg-guindo-700 text-white rounded-xl text-sm font-semibold hover:bg-guindo-800 transition-all"
+                >
+                  <FiUserPlus size={16} />
+                  {showCrearUsuario ? 'Cancelar' : 'Crear Usuario'}
+                </button>
+              </div>
+
+              {/* Formulario crear usuario */}
+              {showCrearUsuario && (
+                <div className="bg-white rounded-2xl shadow-sm p-6 border-2 border-guindo-200">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <FiUserPlus className="text-guindo-700" /> Crear Nuevo Usuario
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="label-field">Nombre completo</label>
+                      <input
+                        className="input-field"
+                        placeholder="Ej: Maria Lopez"
+                        value={nuevoNombre}
+                        onChange={e => setNuevoNombre(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="label-field">Correo electronico</label>
+                      <input
+                        className="input-field"
+                        type="email"
+                        placeholder="Ej: maria@creacionesangy.com"
+                        value={nuevoEmail}
+                        onChange={e => setNuevoEmail(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="label-field">Contrasena</label>
+                      <input
+                        className="input-field"
+                        type="text"
+                        placeholder="Minimo 6 caracteres"
+                        value={nuevoPassword}
+                        onChange={e => setNuevoPassword(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="label-field">Rol</label>
+                      <select
+                        className="input-field"
+                        value={nuevoRol}
+                        onChange={e => setNuevoRol(e.target.value as 'worker' | 'admin')}
+                      >
+                        <option value="worker">Trabajador</option>
+                        <option value="admin">Administrador</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex gap-3">
+                    <button
+                      onClick={crearUsuario}
+                      disabled={creando}
+                      className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50"
+                    >
+                      {creando ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                      ) : (
+                        <FiUserPlus size={16} />
+                      )}
+                      {creando ? 'Creando...' : 'Crear Usuario'}
+                    </button>
+                    <button
+                      onClick={() => { setShowCrearUsuario(false); setNuevoNombre(''); setNuevoEmail(''); setNuevoPassword(''); setNuevoRol('worker') }}
+                      className="px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b">
@@ -229,6 +378,7 @@ export default function AdminPage() {
                   </tbody>
                 </table>
               </div>
+              </>
             )}
 
             {tab === 'auditoria' && (
