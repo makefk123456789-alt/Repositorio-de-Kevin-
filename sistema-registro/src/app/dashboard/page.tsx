@@ -138,63 +138,61 @@ export default function DashboardPage() {
               />
             </div>
 
-            <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-3">Alquileres Activos</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard
-                  icon={<FiUsers className="text-blue-600" size={22} />}
-                  label="Individuales"
-                  value={`${stats.personasIndividuales} personas`}
-                  color="bg-blue-50 border-blue-200"
-                />
-                <StatCard
-                  icon={<FiLayers className="text-purple-600" size={22} />}
-                  label="Grupos"
-                  value={`${stats.gruposTotales} grupos`}
-                  color="bg-purple-50 border-purple-200"
-                />
-                <StatCard
-                  icon={<FiUsers className="text-purple-600" size={22} />}
-                  label="Integrantes de grupos"
-                  value={`${stats.integrantesGrupos} personas`}
-                  color="bg-purple-50 border-purple-200"
-                />
-                <StatCard
-                  icon={<FiUsers className="text-indigo-600" size={22} />}
-                  label="Total personas"
-                  value={`${stats.personasIndividuales + stats.integrantesGrupos} personas`}
-                  color="bg-indigo-50 border-indigo-200"
-                />
+            {/* Contadores grandes y claros */}
+            <div className="bg-white rounded-2xl shadow-sm p-6">
+              <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <FiUsers className="text-guindo-700" /> Contador de Alquileres Activos
+              </h2>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-blue-50 border-2 border-blue-300 rounded-2xl p-5 text-center">
+                  <FiUsers className="text-blue-600 mx-auto mb-2" size={28} />
+                  <p className="text-3xl font-black text-blue-700">{stats.personasIndividuales}</p>
+                  <p className="text-sm font-semibold text-blue-600 mt-1">Personas Individuales</p>
+                </div>
+                <div className="bg-purple-50 border-2 border-purple-300 rounded-2xl p-5 text-center">
+                  <FiLayers className="text-purple-600 mx-auto mb-2" size={28} />
+                  <p className="text-3xl font-black text-purple-700">{stats.gruposTotales}</p>
+                  <p className="text-sm font-semibold text-purple-600 mt-1">Grupos</p>
+                </div>
+                <div className="bg-purple-50 border-2 border-purple-300 rounded-2xl p-5 text-center">
+                  <FiUsers className="text-purple-600 mx-auto mb-2" size={28} />
+                  <p className="text-3xl font-black text-purple-700">{stats.integrantesGrupos}</p>
+                  <p className="text-sm font-semibold text-purple-600 mt-1">Integrantes en Grupos</p>
+                </div>
+                <div className="bg-indigo-50 border-2 border-indigo-300 rounded-2xl p-5 text-center">
+                  <FiUsers className="text-indigo-600 mx-auto mb-2" size={28} />
+                  <p className="text-3xl font-black text-indigo-700">{stats.personasIndividuales + stats.integrantesGrupos}</p>
+                  <p className="text-sm font-semibold text-indigo-600 mt-1">Total Personas</p>
+                </div>
               </div>
             </div>
 
-            <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-3">Garantias por Devolver</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard
-                  icon={<FiCreditCard className="text-cyan-600" size={22} />}
-                  label="Garantias por QR"
-                  value={`${stats.garantiasQrDevolver} a devolver`}
-                  color="bg-cyan-50 border-cyan-200"
-                />
-                <StatCard
-                  icon={<FiDollarSign className="text-green-600" size={22} />}
-                  label="Garantias en efectivo"
-                  value={`${stats.garantiasEfectivoDevolver} a devolver`}
-                  color="bg-green-50 border-green-200"
-                />
-                <StatCard
-                  icon={<FiCreditCard className="text-orange-600" size={22} />}
-                  label="Garantias CI"
-                  value={`${stats.garantiasCiDevolver} a devolver`}
-                  color="bg-orange-50 border-orange-200"
-                />
-                <StatCard
-                  icon={<FiPackage className="text-pink-600" size={22} />}
-                  label="Garantias prenda"
-                  value={`${stats.garantiasPrendaDevolver} a devolver`}
-                  color="bg-pink-50 border-pink-200"
-                />
+            {/* Garantias por devolver - grandes y claros */}
+            <div className="bg-white rounded-2xl shadow-sm p-6">
+              <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <FiCreditCard className="text-guindo-700" /> Garantias por Devolver
+              </h2>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-cyan-50 border-2 border-cyan-300 rounded-2xl p-5 text-center">
+                  <FiCreditCard className="text-cyan-600 mx-auto mb-2" size={28} />
+                  <p className="text-3xl font-black text-cyan-700">{stats.garantiasQrDevolver}</p>
+                  <p className="text-sm font-semibold text-cyan-600 mt-1">Garantias QR a devolver</p>
+                </div>
+                <div className="bg-green-50 border-2 border-green-300 rounded-2xl p-5 text-center">
+                  <FiDollarSign className="text-green-600 mx-auto mb-2" size={28} />
+                  <p className="text-3xl font-black text-green-700">{stats.garantiasEfectivoDevolver}</p>
+                  <p className="text-sm font-semibold text-green-600 mt-1">Garantias Efectivo a devolver</p>
+                </div>
+                <div className="bg-orange-50 border-2 border-orange-300 rounded-2xl p-5 text-center">
+                  <FiCreditCard className="text-orange-600 mx-auto mb-2" size={28} />
+                  <p className="text-3xl font-black text-orange-700">{stats.garantiasCiDevolver}</p>
+                  <p className="text-sm font-semibold text-orange-600 mt-1">Garantias CI a devolver</p>
+                </div>
+                <div className="bg-pink-50 border-2 border-pink-300 rounded-2xl p-5 text-center">
+                  <FiPackage className="text-pink-600 mx-auto mb-2" size={28} />
+                  <p className="text-3xl font-black text-pink-700">{stats.garantiasPrendaDevolver}</p>
+                  <p className="text-sm font-semibold text-pink-600 mt-1">Garantias Prenda a devolver</p>
+                </div>
               </div>
             </div>
 
