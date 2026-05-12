@@ -237,11 +237,11 @@ export default function DashboardPage() {
                       ).map(a => (
                         <tr
                           key={a.id}
-                          className="hover:bg-gray-50 cursor-pointer"
+                          className={`hover:bg-gray-50 cursor-pointer ${a.estado === 'devuelto' ? 'opacity-60' : ''}`}
                           onClick={() => setSelectedAlquiler(a)}
                         >
-                          <td className="px-4 py-3 text-gray-500">{a.codigo}</td>
-                          <td className="px-4 py-3 font-medium">{a.nombre_cliente}</td>
+                          <td className={`px-4 py-3 text-gray-500 ${a.estado === 'devuelto' ? 'line-through' : ''}`}>{a.codigo}</td>
+                          <td className={`px-4 py-3 font-medium ${a.estado === 'devuelto' ? 'line-through text-gray-400' : ''}`}>{a.nombre_cliente}</td>
                           <td className="px-4 py-3">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                               a.tipo === 'individual'
@@ -251,7 +251,7 @@ export default function DashboardPage() {
                               {a.tipo}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-gray-600">{a.danza}</td>
+                          <td className={`px-4 py-3 text-gray-600 ${a.estado === 'devuelto' ? 'line-through text-gray-400' : ''}`}>{a.danza}</td>
                           <td className="px-4 py-3">
                             {a.estado === 'pendiente' ? (
                               <span className={`px-3 py-1 rounded-full text-xs font-bold ${
@@ -272,7 +272,7 @@ export default function DashboardPage() {
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-right font-medium">Bs. {a.precio_total}</td>
+                          <td className={`px-4 py-3 text-right font-medium ${a.estado === 'devuelto' ? 'line-through text-gray-400' : ''}`}>Bs. {a.precio_total}</td>
                         </tr>
                       ))}
                       {recentAlquileres.length === 0 && (

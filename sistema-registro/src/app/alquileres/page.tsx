@@ -6,7 +6,7 @@ import { useAuth } from '@/components/AuthProvider'
 import ProtectedLayout from '@/components/ProtectedLayout'
 import { Alquiler, IntegranteGrupo } from '@/lib/types'
 import toast from 'react-hot-toast'
-import { FiSearch, FiCheck, FiEye, FiX, FiAlertTriangle, FiPrinter } from 'react-icons/fi'
+import { FiSearch, FiCheck, FiX, FiAlertTriangle, FiPrinter } from 'react-icons/fi'
 
 export default function AlquileresPage() {
   const { profile, isAdmin } = useAuth()
@@ -329,10 +329,14 @@ export default function AlquileresPage() {
                 </thead>
                 <tbody className="divide-y">
                   {filtered.map(a => (
-                    <tr key={a.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-500">{a.codigo}</td>
+                    <tr
+                      key={a.id}
+                      className={`hover:bg-gray-50 cursor-pointer ${a.estado === 'devuelto' ? 'opacity-60' : ''}`}
+                      onClick={() => openDetail(a)}
+                    >
+                      <td className={`px-4 py-3 text-gray-500 ${a.estado === 'devuelto' ? 'line-through' : ''}`}>{a.codigo}</td>
                       <td className="px-4 py-3">
-                        <div className="font-medium">{a.nombre_cliente}</div>
+                        <div className={`font-medium ${a.estado === 'devuelto' ? 'line-through text-gray-400' : ''}`}>{a.nombre_cliente}</div>
                         <div className="text-xs text-gray-400">{a.celular}</div>
                       </td>
                       <td className="px-4 py-3">
@@ -342,8 +346,8 @@ export default function AlquileresPage() {
                           {a.tipo}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-600">{a.danza}</td>
-                      <td className="px-4 py-3 text-gray-600 text-xs">{a.garantia}</td>
+                      <td className={`px-4 py-3 text-gray-600 ${a.estado === 'devuelto' ? 'line-through text-gray-400' : ''}`}>{a.danza}</td>
+                      <td className={`px-4 py-3 text-gray-600 text-xs ${a.estado === 'devuelto' ? 'line-through text-gray-400' : ''}`}>{a.garantia}</td>
                       <td className="px-4 py-3 text-gray-600 text-xs">
                         {a.fecha_devolucion ? new Date(a.fecha_devolucion).toLocaleDateString('es-BO') : '-'}
                       </td>
@@ -365,16 +369,9 @@ export default function AlquileresPage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right font-medium">Bs. {a.precio_total}</td>
-                      <td className="px-4 py-3 text-center">
+                      <td className={`px-4 py-3 text-right font-medium ${a.estado === 'devuelto' ? 'line-through text-gray-400' : ''}`}>Bs. {a.precio_total}</td>
+                      <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => openDetail(a)}
-                            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
-                            title="Ver detalle"
-                          >
-                            <FiEye size={16} />
-                          </button>
                           <button
                             onClick={() => printAlquiler(a)}
                             className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
@@ -382,23 +379,23 @@ export default function AlquileresPage() {
                           >
                             <FiPrinter size={16} />
                           </button>
+                          {a.estado === 'pendiente' && a.tipo === 'individual' && (
+                            <button
+                              onClick={() => marcarDevuelto(a)}
+                              className="p-1.5 rounded-lg hover:bg-green-100 text-green-600"
+                              title="Marcar devuelto"
+                            >
+                              <FiCheck size={16} />
+                            </button>
+                          )}
                           {a.estado === 'pendiente' && (
-                            <>
-                              <button
-                                onClick={() => marcarDevuelto(a)}
-                                className="p-1.5 rounded-lg hover:bg-green-100 text-green-600"
-                                title="Marcar devuelto"
-                              >
-                                <FiCheck size={16} />
-                              </button>
-                              <button
-                                onClick={() => marcarPerdida(a)}
-                                className="p-1.5 rounded-lg hover:bg-red-100 text-red-600"
-                                title="Marcar como perdida"
-                              >
-                                <FiAlertTriangle size={16} />
-                              </button>
-                            </>
+                            <button
+                              onClick={() => marcarPerdida(a)}
+                              className="p-1.5 rounded-lg hover:bg-red-100 text-red-600"
+                              title="Marcar como perdida"
+                            >
+                              <FiAlertTriangle size={16} />
+                            </button>
                           )}
                         </div>
                       </td>
