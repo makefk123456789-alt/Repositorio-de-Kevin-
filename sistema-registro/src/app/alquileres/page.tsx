@@ -212,7 +212,8 @@ export default function AlquileresPage() {
     }).select().single()
 
     if (error) {
-      toast.error('Error al agregar integrante')
+      console.error('Error agregar integrante:', error)
+      toast.error(`Error: ${error.message || 'No se pudo agregar integrante'}`)
       setAgregandoInt(false)
       return
     }
