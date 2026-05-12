@@ -728,6 +728,8 @@ export default function AlquileresPage() {
                           <label className="label-field">Tipo garantia</label>
                           <select className="input-field" value={nuevoIntTipoGarantia} onChange={e => setNuevoIntTipoGarantia(e.target.value)}>
                             <option value="ci_efectivo">CI + Efectivo</option>
+                            <option value="ci_qr">CI + QR</option>
+                            <option value="ci_prenda">CI + Prenda</option>
                             <option value="ci">CI</option>
                             <option value="efectivo">Efectivo</option>
                             <option value="qr">QR</option>
