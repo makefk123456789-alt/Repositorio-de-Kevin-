@@ -80,3 +80,21 @@ body {
   box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
   transform: translateY(-2px);
 }
+
+/* Row animation for overdue */
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
+/* Responsive table */
+@media (max-width: 640px) {
+  .input-field {
+    font-size: 16px;
+  }
+  
+  .btn-primary {
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+  }
+}

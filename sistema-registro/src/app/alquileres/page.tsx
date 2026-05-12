@@ -327,6 +327,13 @@ export default function AlquileresPage() {
     return new Date(a.fecha_devolucion) < new Date()
   }
 
+  const getRowColor = (a: Alquiler) => {
+    if (a.estado === 'devuelto') return 'bg-orange-50 border-l-4 border-l-orange-400'
+    if (a.estado === 'perdida') return 'bg-red-50 border-l-4 border-l-red-400'
+    if (isOverdue(a)) return 'bg-red-50 border-l-4 border-l-red-400'
+    return 'bg-white border-l-4 border-l-transparent'
+  }
+
   const filtered = alquileres.filter(a => {
     if (a.estado === 'perdida') return false
     const matchText = !filtro ||
@@ -392,6 +399,14 @@ export default function AlquileresPage() {
             <div className="animate-spin rounded-full h-10 w-10 border-4 border-guindo-700 border-t-transparent" />
           </div>
         ) : (
+          <>
+          {/* Leyenda de colores */}
+          <div className="flex flex-wrap gap-4 text-xs mb-1 bg-gray-50 rounded-xl px-4 py-2">
+            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-white border border-gray-200" /> Activo (a tiempo)</div>
+            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-orange-100 border border-orange-300" /> Ya devolvio</div>
+            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-100 border border-red-300" /> Vencido (no devolvio)</div>
+          </div>
+
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -412,45 +427,38 @@ export default function AlquileresPage() {
                   {filtered.map(a => (
                     <tr
                       key={a.id}
-                      className={`hover:bg-gray-50 cursor-pointer ${a.estado === 'devuelto' ? 'opacity-60' : ''}`}
+                      className={`cursor-pointer hover:brightness-95 transition-all ${getRowColor(a)}`}
                       onClick={() => openDetail(a)}
                     >
-                      <td className={`px-4 py-3 text-gray-500 ${a.estado === 'devuelto' ? 'line-through' : ''}`}>{a.codigo}</td>
+                      <td className="px-4 py-3 text-gray-500 font-mono text-xs">{a.codigo}</td>
                       <td className="px-4 py-3">
-                        <div className={`font-medium ${a.estado === 'devuelto' ? 'line-through text-gray-400' : ''}`}>{a.nombre_cliente}</div>
+                        <div className="font-medium text-gray-800">{a.nombre_cliente}</div>
                         <div className="text-xs text-gray-400">{a.celular}</div>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                           a.tipo === 'individual' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
                         }`}>
-                          {a.tipo}
+                          {a.tipo === 'individual' ? 'Individual' : 'Grupal'}
                         </span>
                       </td>
-                      <td className={`px-4 py-3 text-gray-600 ${a.estado === 'devuelto' ? 'line-through text-gray-400' : ''}`}>{a.danza}</td>
-                      <td className={`px-4 py-3 text-gray-600 text-xs ${a.estado === 'devuelto' ? 'line-through text-gray-400' : ''}`}>{a.garantia}</td>
+                      <td className="px-4 py-3 text-gray-600">{a.danza}</td>
+                      <td className="px-4 py-3 text-gray-600 text-xs">{a.garantia}</td>
                       <td className="px-4 py-3 text-gray-600 text-xs">
                         {a.fecha_devolucion ? new Date(a.fecha_devolucion).toLocaleDateString('es-BO') : '-'}
                       </td>
                       <td className="px-4 py-3">
-                        {a.estado === 'pendiente' ? (
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                            isOverdue(a)
-                              ? 'bg-yellow-300 text-yellow-900'
-                              : 'bg-orange-100 text-orange-700'
-                          }`}>
-                            Alquiler Activo
-                          </span>
+                        {a.estado === 'devuelto' ? (
+                          <span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-200 text-orange-800">Devuelto</span>
+                        ) : a.estado === 'perdida' ? (
+                          <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-200 text-red-800">Perdida</span>
+                        ) : isOverdue(a) ? (
+                          <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-200 text-red-800 animate-pulse">Vencido</span>
                         ) : (
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                            a.estado === 'devuelto' ? 'bg-green-100 text-green-700' :
-                            'bg-red-100 text-red-700'
-                          }`}>
-                            {a.estado === 'devuelto' ? 'Devuelto' : a.estado}
-                          </span>
+                          <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700">Activo</span>
                         )}
                       </td>
-                      <td className={`px-4 py-3 text-right font-medium ${a.estado === 'devuelto' ? 'line-through text-gray-400' : ''}`}>Bs. {a.precio_total}</td>
+                      <td className="px-4 py-3 text-right font-bold text-gray-800">Bs. {a.precio_total}</td>
                       <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-1">
                           <button
@@ -493,6 +501,7 @@ export default function AlquileresPage() {
               </table>
             </div>
           </div>
+          </>
         )}
 
         {/* Detail modal */}

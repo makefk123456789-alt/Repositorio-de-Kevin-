@@ -454,10 +454,15 @@ export default function FinanzasPage() {
                           <td className="px-4 py-3 text-gray-600 text-xs">{a.garantia}</td>
                           <td className="px-4 py-3">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              a.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-700' :
-                              a.estado === 'devuelto' ? 'bg-green-100 text-green-700' :
+                              a.estado === 'devuelto' ? 'bg-orange-100 text-orange-700' :
+                              a.estado === 'pendiente' && new Date(a.fecha_devolucion) < new Date() ? 'bg-red-100 text-red-700' :
+                              a.estado === 'pendiente' ? 'bg-gray-100 text-gray-700' :
                               'bg-red-100 text-red-700'
-                            }`}>{a.estado}</span>
+                            }`}>{
+                              a.estado === 'devuelto' ? 'Devuelto' :
+                              a.estado === 'pendiente' && new Date(a.fecha_devolucion) < new Date() ? 'Vencido' :
+                              a.estado === 'pendiente' ? 'Activo' : a.estado
+                            }</span>
                           </td>
                           <td className="px-4 py-3 text-right font-medium">Bs. {a.precio_total}</td>
                         </tr>
